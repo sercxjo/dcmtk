@@ -1794,6 +1794,7 @@ receiveTransportConnectionTCP(PRIVATE_NETWORKKEY ** network,
         {
           // we're the child process, continue normally
           processIsForkedChild = OFTrue;
+          close((*network)->networkSpecific.TCP.listenSocket);
         }
     }
 #elif defined(_WIN32)
@@ -2247,6 +2248,7 @@ initializeNetworkTCP(PRIVATE_NETWORKKEY ** key, void *parameter)
       }
       reuse = 1;
 #ifdef _WIN32
+      SetHandleInformation((HANDLE)sock, HANDLE_FLAG_INHERIT, 0);
       if (setsockopt(sock, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, (char *) &reuse, sizeof(reuse)) < 0)
 #else
       if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *) &reuse, sizeof(reuse)) < 0)
