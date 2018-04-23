@@ -284,7 +284,7 @@ readPDUBodyTCP(PRIVATE_ASSOCIATIONKEY ** association,
                unsigned long *pduLength);
 static OFCondition
 defragmentTCP(DcmTransportConnection *connection, DUL_BLOCKOPTIONS block, time_t timerStart,
-              int timeout, void *b, unsigned long l, unsigned long *rtnLen);
+              int timeout, DUL_TimeoutCallback *timeoutCallback, void *b, unsigned long l, unsigned long *rtnLen);
 
 static OFString dump_pdu(const char *type, void *buffer, unsigned long length);
 
@@ -2111,7 +2111,7 @@ AA_6_IgnorePDU(PRIVATE_NETWORKKEY ** /*network*/,
     {
         cond = defragmentTCP((*association)->connection,
                              DUL_NOBLOCK, (*association)->timerStart,
-                   (*association)->timeout, buffer, sizeof(buffer), &l);
+                   (*association)->timeout, (*association)->timeoutCallback, buffer, sizeof(buffer), &l);
         if (cond.bad()) return cond;
         PDULength -= l;
     }
@@ -2263,7 +2263,7 @@ requestAssociationTCP(PRIVATE_NETWORKKEY ** network,
     server.setPort(OFstatic_cast(unsigned short, htons(OFstatic_cast(unsigned short, port))));
 
     // get global connection timeout
-    Sint32 connectTimeout = dcmConnectionTimeout.get();
+    Sint32 connectTimeout = params->timeoutCallback? 1: dcmConnectionTimeout.get();
 
     s = socket(server.getFamily(), SOCK_STREAM, 0);
 #ifdef _WIN32
@@ -2322,6 +2322,7 @@ requestAssociationTCP(PRIVATE_NETWORKKEY ** network,
         timeout.tv_sec = connectTimeout;
         timeout.tv_usec = 0;
 
+        unsigned long attempt = 0;
         do {
 #ifdef DCMTK_HAVE_POLL
             struct pollfd pfd[] =
@@ -2333,7 +2334,8 @@ requestAssociationTCP(PRIVATE_NETWORKKEY ** network,
             // the typecast is safe because Windows ignores the first select() parameter anyway
             rc = select(OFstatic_cast(int, s + 1), NULL, &fdSet, NULL, &timeout);
 #endif
-        } while (rc == -1 && OFStandard::getLastNetworkErrorCode().value() == DCMNET_EINTR);
+        } while (rc == -1 && OFStandard::getLastNetworkErrorCode().value() == DCMNET_EINTR
+              || rc == 0 && params->timeoutCallback && params->timeoutCallback->timeout(attempt++));
 
         if (DCM_dcmnetLogger.isEnabledFor(OFLogger::DEBUG_LOG_LEVEL))
         {
@@ -3491,7 +3493,7 @@ readPDUHeadTCP(PRIVATE_ASSOCIATIONKEY ** association,
 
     /* try to receive PDU header (6 bytes) over the network, mind blocking */
     /* options; in the end, buffer will contain the 6 bytes that were read. */
-    OFCondition cond = defragmentTCP((*association)->connection, block, (*association)->timerStart, timeout, buffer, 6, &length);
+    OFCondition cond = defragmentTCP((*association)->connection, block, (*association)->timerStart, timeout, (*association)->timeoutCallback, buffer, 6, &length);
 
     /* if receiving was not successful, return the corresponding error value */
     if (cond.bad()) return cond;
@@ -3610,7 +3612,7 @@ readPDUBodyTCP(PRIVATE_ASSOCIATIONKEY ** association,
       /* we want to try to receive (*association)->nextPDULength bytes of data on the network) */
       /* The information that was received will be available through the buffer variable. */
       cond = defragmentTCP((*association)->connection,
-                         block, (*association)->timerStart, timeout,
+                         block, (*association)->timerStart, timeout, (*association)->timeoutCallback,
                          buffer, (*association)->nextPDULength, &length);
     }
 
@@ -3648,7 +3650,7 @@ readPDUBodyTCP(PRIVATE_ASSOCIATIONKEY ** association,
 
 static OFCondition
 defragmentTCP(DcmTransportConnection *connection, DUL_BLOCKOPTIONS block, time_t timerStart,
-              int timeout, void *p, unsigned long l, unsigned long *rtnLen)
+              int timeout, DUL_TimeoutCallback *timeoutCallback, void *p, unsigned long l, unsigned long *rtnLen)
 {
     unsigned char *b;
     int bytesRead;
@@ -3687,14 +3689,19 @@ defragmentTCP(DcmTransportConnection *connection, DUL_BLOCKOPTIONS block, time_t
              * DUL_READTIMEOUT shall be returned. Note that if DUL_BLOCK is specified the application
              * will not stop waiting until data is actually received over the network.
              */
-            if (block == DUL_NOBLOCK)
+            if (block == DUL_NOBLOCK) for (;;)
             {
                 /* determine remaining time to wait */
-                timeToWait = timeout - (int) (time(NULL) - timerStart);
+                if (timeoutCallback) timeToWait = 1;
+                else {
+                    timeToWait = timeout - (int) (time(NULL) - timerStart);
+                    if (timeToWait<0) timeToWait = 0;
+                }
 
                 /* go ahead and see if within timeout seconds data will be received over the network. */
                 /* if not, return DUL_READTIMEOUT, if yes, stay in this function. */
-                if (!connection->networkDataAvailable(timeToWait)) return DUL_READTIMEOUT;
+                if (connection->networkDataAvailable(timeToWait)) break;
+                if (!timeoutCallback || !timeoutCallback->timeout(time(NULL) - timerStart)) return DUL_READTIMEOUT;
             }
 
             /* data has become available, now call read(). */
