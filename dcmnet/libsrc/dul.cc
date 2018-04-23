@@ -163,7 +163,7 @@ createNetworkKey(const char *mode, int timeout, unsigned long opt,
                  PRIVATE_NETWORKKEY ** k);
 static OFCondition
 createAssociationKey(PRIVATE_NETWORKKEY ** network, const char *node,
-                     unsigned long maxPDU,
+                     unsigned long maxPDU, DUL_TimeoutCallback *timeoutCallback,
                      PRIVATE_ASSOCIATIONKEY ** assoc);
 static OFCondition initializeNetworkTCP(PRIVATE_NETWORKKEY ** k, void *p);
 static OFCondition
@@ -574,7 +574,7 @@ DUL_RequestAssociation(
         return makeDcmnetCondition(DULC_ILLEGALPARAMETER, OF_error, "DUL Illegal parameter (maxPDU) in function DUL_RequestAssociation");
     }
 
-    cond = createAssociationKey(network, "", params->maxPDU, association);
+    cond = createAssociationKey(network, "", params->maxPDU, params->timeoutCallback, association);
     if (cond.bad())
         return cond;
 
@@ -718,7 +718,7 @@ DUL_ReceiveAssociationRQ(
     if (params->maxPDU < MIN_PDU_LENGTH || params->maxPDU > MAX_PDU_LENGTH)
         return makeDcmnetCondition(DULC_ILLEGALPARAMETER, OF_error, "DUL Illegal parameter (maxPDU) in function DUL_ReceiveAssociationRQ");
 
-    cond = createAssociationKey(network, "", params->maxPDU, association);
+    cond = createAssociationKey(network, "", params->maxPDU, params->timeoutCallback, association);
     if (cond.bad())
         return cond;
 
@@ -2328,7 +2328,7 @@ initializeNetworkTCP(PRIVATE_NETWORKKEY ** key, void *parameter)
 */
 static OFCondition
 createAssociationKey(PRIVATE_NETWORKKEY ** networkKey,
-                     const char *remoteNode, unsigned long maxPDU,
+                     const char *remoteNode, unsigned long maxPDU, DUL_TimeoutCallback *timeoutCallback,
                      PRIVATE_ASSOCIATIONKEY ** associationKey)
 {
     PRIVATE_ASSOCIATIONKEY *key;
@@ -2374,6 +2374,7 @@ createAssociationKey(PRIVATE_NETWORKKEY ** networkKey,
     key->logHandle = NULL;
     key->connection = NULL;
     key->modeCallback = NULL;
+    key->timeoutCallback = timeoutCallback;
     *associationKey = key;
     return EC_Normal;
 }

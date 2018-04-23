@@ -147,6 +147,7 @@ typedef struct {
     unsigned long fragmentBufferLength;
     unsigned char *fragmentBuffer;
     DUL_ModeCallback *modeCallback;
+    DUL_TimeoutCallback *timeoutCallback;
 }   PRIVATE_ASSOCIATIONKEY;
 
 #define KEY_NETWORK "KEY NETWORK"

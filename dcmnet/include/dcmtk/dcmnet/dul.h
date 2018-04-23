@@ -155,6 +155,20 @@ public:
   virtual void callback(unsigned long mode) = 0;
 };
 
+class DCMTK_DCMNET_EXPORT DUL_TimeoutCallback
+{
+public:
+
+  /// destructor
+  virtual ~DUL_TimeoutCallback() {}
+
+  /** This method will be calld when timeout occured to decide to continue or interrupt
+   *  @param attempt wait loop iteration number
+   *  @return true to continue waiting, false to interrupt
+   */
+  virtual bool timeout(unsigned long attempt) = 0;
+};
+
 typedef struct {
     char applicationContextName[DUL_LEN_NAME + 1];
     char callingAPTitle[DUL_LEN_TITLE + 1];
@@ -179,6 +193,7 @@ typedef struct {
     SOPClassExtendedNegotiationSubItemList *acceptedExtNegList;
     UserIdentityNegotiationSubItemRQ *reqUserIdentNeg;
     UserIdentityNegotiationSubItemAC *ackUserIdentNeg;
+    DUL_TimeoutCallback *timeoutCallback;
 
     OFBool useSecureLayer;
 }   DUL_ASSOCIATESERVICEPARAMETERS;
