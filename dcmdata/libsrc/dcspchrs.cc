@@ -145,6 +145,7 @@ OFCondition DcmSpecificCharacterSet::selectCharacterSet(const OFString &fromChar
         {
             // a single character set specified (no code extensions)
             status = selectCharacterSetWithoutCodeExtensions();
+            if (status.bad()) status = selectCharacterSetWithCodeExtensions(sourceVM);
         } else {
             // multiple character sets specified (code extensions used)
             status = selectCharacterSetWithCodeExtensions(sourceVM);
@@ -304,7 +305,7 @@ OFCondition DcmSpecificCharacterSet::selectCharacterSetWithoutCodeExtensions()
 OFCondition DcmSpecificCharacterSet::selectCharacterSetWithCodeExtensions(const unsigned long sourceVM)
 {
     // first, check whether multiple character sets are specified (i.e. code extensions used)
-    if (sourceVM <= 1)
+    if (sourceVM < 1)
         return EC_IllegalCall;
     // then proceed with the real work
     OFCondition status = EC_Normal;
