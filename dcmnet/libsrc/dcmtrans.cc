@@ -30,6 +30,7 @@
 #include "dcmtk/dcmnet/dcmtrans.h"
 #include "dcmtk/dcmnet/dcompat.h"     /* compatibility code for certain Unix dialects such as SunOS */
 #include "dcmtk/dcmnet/diutil.h"
+#include "dcmtk/ofstd/ofvector.h"
 
 #define INCLUDE_CSTDLIB
 #define INCLUDE_CSTDIO
@@ -54,7 +55,6 @@ END_EXTERN_C
 
 #ifdef DCMTK_HAVE_POLL
 #include <poll.h>
-#include "dcmtk/ofstd/ofvector.h"
 #endif
 
 /* platform independent definition of EINTR */
@@ -190,23 +190,26 @@ OFBool DcmTransportConnection::fastSelectReadableAssociation(DcmTransportConnect
 
 #ifdef _WIN32
   SOCKET socketfd = INVALID_SOCKET;
-  SOCKET maxsocketfd = INVALID_SOCKET;
-#else
+#else /* _WIN32 */
   int socketfd = -1;
-#ifndef DCMTK_HAVE_POLL
+#endif /* _WIN32 */
+
+#ifdef DCMTK_HAVE_POLL
+  OFVector<struct pollfd> pfd;
+  pfd.reserve(connCount);
+  struct pollfd pfd1 = {0, POLLIN, 0};
+#else /* DCMTK_HAVE_POLL */
+  fd_set fdset;
+  FD_ZERO(&fdset);
+#ifdef _WIN32
+  SOCKET maxsocketfd = INVALID_SOCKET;
+#else /* _WIN32 */
   int maxsocketfd = -1;
-#endif
-#endif
+#endif /* _WIN32 */
+#endif /* DCMTK_HAVE_POLL */
 
   int i=0;
   struct timeval t;
-#ifndef DCMTK_HAVE_POLL
-  fd_set fdset;
-  FD_ZERO(&fdset);
-#else
-  OFVector<struct pollfd> pfd;
-  pfd.reserve(connCount);
-#endif
   OFTimer timer;
   int lTimeout = timeout;
 
@@ -215,17 +218,17 @@ OFBool DcmTransportConnection::fastSelectReadableAssociation(DcmTransportConnect
     if (connections[i])
     {
       socketfd = connections[i]->getSocket();
-#ifndef DCMTK_HAVE_POLL
+#ifdef DCMTK_HAVE_POLL
+      pfd1.fd = socketfd;
+      pfd.push_back(pfd1);
+#else /* DCMTK_HAVE_POLL */
 #ifdef __MINGW32__
       /* on MinGW, FD_SET expects an unsigned first argument */
       FD_SET((unsigned int)socketfd, &fdset);
-#else
+#else /* __MINGW32__ */
       FD_SET(socketfd, &fdset);
 #endif /* __MINGW32__ */
       if (socketfd > maxsocketfd) maxsocketfd = socketfd;
-#else
-      struct pollfd pfd1 = {socketfd, POLLIN, 0};
-      pfd.push_back(pfd1);
 #endif /* DCMTK_HAVE_POLL */
     }
   }
@@ -239,7 +242,7 @@ OFBool DcmTransportConnection::fastSelectReadableAssociation(DcmTransportConnect
     t.tv_usec = 0;
 
 #ifdef DCMTK_HAVE_POLL
-    int nfound = poll(&pfd[0], connCount, t.tv_sec*1000+(t.tv_usec/1000));
+    int nfound = poll(&pfd[0], pfd.size(), t.tv_sec*1000+(t.tv_usec/1000));
 #else /* DCMTK_HAVE_POLL */
 #ifdef HAVE_INTP_SELECT
     int nfound = select(OFstatic_cast(int, maxsocketfd + 1), (int *)(&fdset), NULL, NULL, &t);
@@ -275,11 +278,11 @@ OFBool DcmTransportConnection::fastSelectReadableAssociation(DcmTransportConnect
   {
     if (connections[i])
     {
+      /* if not available, set entry in array to NULL */
 #ifdef DCMTK_HAVE_POLL
       if(!(pfd[i].revents & POLLIN)) connections[i] = NULL;
 #else
       socketfd = connections[i]->getSocket();
-      /* if not available, set entry in array to NULL */
       if (!FD_ISSET(socketfd, &fdset)) connections[i] = NULL;
 #endif
     }

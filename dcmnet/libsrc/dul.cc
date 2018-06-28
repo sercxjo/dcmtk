@@ -141,6 +141,7 @@ END_EXTERN_C
 #include "dcmtk/dcmnet/cond.h"
 #include "dcmtk/dcmnet/lst.h"
 #include "dcmtk/ofstd/ofconsol.h"
+#include "dcmtk/ofstd/ofstd.h"
 
 #include "dcmtk/dcmnet/dul.h"
 #include "dulstruc.h"
@@ -155,6 +156,7 @@ OFGlobal<Sint32> dcmConnectionTimeout(-1);
 OFGlobal<DcmNativeSocketType> dcmExternalSocketHandle(DCMNET_INVALID_SOCKET);
 OFGlobal<const char *> dcmTCPWrapperDaemonName((const char *)NULL);
 OFGlobal<unsigned long> dcmEnableBackwardCompatibility(0);
+OFGlobal<size_t> dcmAssociatePDUSizeLimit(0x100000);
 
 static int networkInitialized = 0;
 
@@ -2142,7 +2144,7 @@ createNetworkKey(const char *mode,
     }
     *key = (PRIVATE_NETWORKKEY *) malloc(sizeof(PRIVATE_NETWORKKEY));
     if (*key == NULL) return EC_MemoryExhausted;
-    (void) strcpy((*key)->keyType, KEY_NETWORK);
+    OFStandard::strlcpy((*key)->keyType, KEY_NETWORK, sizeof((*key)->keyType));
 
     (*key)->applicationFunction = 0;
 
@@ -2294,7 +2296,7 @@ initializeNetworkTCP(PRIVATE_NETWORKKEY ** key, void *parameter)
       }
     }
 
-    (*key)->networkSpecific.TCP.tLayer = new DcmTransportLayer((*key)->applicationFunction);
+    (*key)->networkSpecific.TCP.tLayer = new DcmTransportLayer();
     (*key)->networkSpecific.TCP.tLayerOwned = 1;
     if (NULL == (*key)->networkSpecific.TCP.tLayer)
     {
@@ -2338,10 +2340,10 @@ createAssociationKey(PRIVATE_NETWORKKEY ** networkKey,
     if (key == NULL) return EC_MemoryExhausted;
     key->receivePDUQueue = NULL;
 
-    (void) strcpy(key->keyType, KEY_ASSOCIATION);
+    OFStandard::strlcpy(key->keyType, KEY_ASSOCIATION, sizeof(key->keyType));
     key->applicationFunction = (*networkKey)->applicationFunction;
 
-    (void) strcpy(key->remoteNode, remoteNode);
+    OFStandard::strlcpy(key->remoteNode, remoteNode, sizeof(key->remoteNode));
     key->presentationContextID = 0;
     key->timeout = (*networkKey)->timeout;
     key->timerStart = 0;
@@ -2436,11 +2438,11 @@ get_association_parameter(void *paramAddress,
     if ((paramType == DUL_K_STRING) && (outputLength < strlen((char*)paramAddress))) return DUL_INSUFFICIENTBUFFERLENGTH;
 
     switch (paramType) {
-    case DUL_K_INTEGER:
+      case DUL_K_INTEGER:
         (void) memcpy(outputAddress, paramAddress, paramLength);
         break;
-    case DUL_K_STRING:
-        strcpy((char*)outputAddress, (char*)paramAddress);
+      case DUL_K_STRING:
+        OFStandard::strlcpy((char*)outputAddress, (char*)paramAddress, outputLength);
         break;
     }
     return EC_Normal;

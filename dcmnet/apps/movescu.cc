@@ -1,6 +1,6 @@
 /*
  *
- *  Copyright (C) 1994-2017, OFFIS e.V.
+ *  Copyright (C) 1994-2018, OFFIS e.V.
  *  All rights reserved.  See COPYRIGHT file for details.
  *
  *  This software and supporting documentation were developed by
@@ -57,15 +57,8 @@ static char rcsid[] = "$dcmtk: " OFFIS_CONSOLE_APPLICATION " v"
 #define APPLICATIONTITLE        "MOVESCU"
 #define PEERAPPLICATIONTITLE    "ANY-SCP"
 
-// general
-#define EXITCODE_NO_ERROR                        0
-#define EXITCODE_COMMANDLINE_SYNTAX_ERROR        1      // this code is the default for printError()
-#define EXITCODE_INSUFFICIENT_PRIVILEGES         2
-#define EXITCODE_SETUID_FAILED                   3
-
-// output file errors
-#define EXITCODE_CANNOT_WRITE_OUTPUT_FILE       40
-#define EXITCODE_INVALID_OUTPUT_DIRECTORY       45
+/* exit codes for this command line tool */
+/* (common codes are defined in "ofexit.h" included from "ofconapp.h") */
 
 // network errors
 #define EXITCODE_CANNOT_INITIALIZE_NETWORK      60
@@ -1394,7 +1387,7 @@ storeSCPCallback(
         if ((rsp->DimseStatus == STATUS_Success) && !opt_ignore)
         {
           /* which SOP class and SOP instance ? */
-          if (!DU_findSOPClassAndInstanceInDataSet(*imageDataSet, sopClass, sopInstance, opt_correctUIDPadding))
+          if (!DU_findSOPClassAndInstanceInDataSet(*imageDataSet, sopClass, sizeof(sopClass), sopInstance, sizeof(sopInstance), opt_correctUIDPadding))
           {
              OFLOG_FATAL(movescuLogger, "bad DICOM file: " << imageFileName);
              rsp->DimseStatus = STATUS_STORE_Error_CannotUnderstand;
@@ -1428,7 +1421,7 @@ static OFCondition storeSCP(
 #ifdef _WIN32
         tmpnam(imageFileName);
 #else
-        strcpy(imageFileName, NULL_DEVICE_NAME);
+        OFStandard::strlcpy(imageFileName, NULL_DEVICE_NAME, 2048);
 #endif
     } else {
         sprintf(imageFileName, "%s.%s",
@@ -1653,14 +1646,14 @@ moveSCU(T_ASC_Association *assoc, const char *fname)
     callbackData.presId = presId;
 
     req.MessageID = msgId;
-    strcpy(req.AffectedSOPClassUID, sopClass);
+    OFStandard::strlcpy(req.AffectedSOPClassUID, sopClass, sizeof(req.AffectedSOPClassUID));
     req.Priority = DIMSE_PRIORITY_MEDIUM;
     req.DataSetType = DIMSE_DATASET_PRESENT;
     if (opt_moveDestination == NULL) {
         /* set the destination to be me */
-        ASC_getAPTitles(assoc->params, req.MoveDestination, NULL, NULL);
+        ASC_getAPTitles(assoc->params, req.MoveDestination, sizeof(req.MoveDestination), NULL, 0, NULL, 0);
     } else {
-        strcpy(req.MoveDestination, opt_moveDestination);
+        OFStandard::strlcpy(req.MoveDestination, opt_moveDestination, sizeof(req.MoveDestination));
     }
 
     if (movescuLogger.isEnabledFor(OFLogger::DEBUG_LOG_LEVEL))

@@ -1,6 +1,6 @@
 /*
  *
- *  Copyright (C) 2002-2016, OFFIS e.V.
+ *  Copyright (C) 2002-2018, OFFIS e.V.
  *  All rights reserved.  See COPYRIGHT file for details.
  *
  *  This software and supporting documentation were developed by
@@ -257,7 +257,7 @@ OFTEST(ofstd_OFStandard_removeRootDirFromPathname)
     OFCHECK(OFStandard::removeRootDirFromPathname(result, nullPtr, nullPtr).good());
 }
 
-OFTEST(ofstd_safeSubtractAndAdd)
+OFTEST(ofstd_safeSubtractAddMult)
 {
   // --------------- Subtraction ----------------
 
@@ -291,4 +291,69 @@ OFTEST(ofstd_safeSubtractAndAdd)
   // dividing and then multiplying by 2 is required since max may be an
   // odd number so that max/2 is rounded to the floor number.
   OFCHECK_EQUAL(a, OFnumeric_limits<unsigned int>::max());
+
+  // --------------- Multiplication ----------------
+  a = OFnumeric_limits<unsigned int>::max() / 2;
+  // check whether overflow occurred (it should)
+  OFCHECK( OFStandard::safeMult(a, OFstatic_cast(unsigned int, 3), a) == OFFalse);
+  // check whether no overflow occurred (it shouldn't)
+  OFCHECK_EQUAL(a, OFnumeric_limits<unsigned int>::max() / 2);
+
+  b = 2; // a still equals max / 2
+  OFCHECK( OFStandard::safeMult(a, b, a) == OFTrue);
+  if ( (OFnumeric_limits<unsigned int>::max() %2 == 1) )
+      OFCHECK_EQUAL(a+1, OFnumeric_limits<unsigned int>::max());
+  else
+      OFCHECK_EQUAL(a, OFnumeric_limits<unsigned int>::max());
+}
+
+OFTEST(ofstd_snprintf)
+{
+  // This test tests whether OFStandard::snprintf() properly "cuts"
+  // the formatted output string based on the given buffer size
+  // and whether it returns the correct return value, i.e.
+  // the number of characters that SHOULD have been written.
+  // We only exercise this for a formatted integer and not
+  // for all other possible types of arguments
+
+  char buf[10]; // a buffer for 10 characters (including terminating NUL)
+  const char *s = "987654321"; // a 10 character string (including terminating NUL)
+  int i = 12345;
+  int count = 0;
+  OFString zero;
+  OFString one = "1";
+  OFString two = "12";
+  OFString three = "123";
+  OFString four = "1234";
+  OFString five = "12345";
+
+  // initialize buffer with a zero terminated string
+  // that is definitely not what we expect
+  memcpy(buf, s, 10);
+
+  // snprintf() into the buffer, check result and return value
+  count = OFStandard::snprintf(buf, 1, "%i", i);
+  OFCHECK((count == 5) && (zero ==  buf));
+
+  // repeat the same with increasing buffer size...
+  memcpy(buf, s, 10);
+  count = OFStandard::snprintf(buf, 2, "%i", i);
+  OFCHECK((count == 5) && (one ==  buf));
+
+  memcpy(buf, s, 10);
+  count = OFStandard::snprintf(buf, 3, "%i", i);
+  OFCHECK((count == 5) && (two ==  buf));
+
+  memcpy(buf, s, 10);
+  count = OFStandard::snprintf(buf, 4, "%i", i);
+  OFCHECK((count == 5) && (three ==  buf));
+
+  memcpy(buf, s, 10);
+  count = OFStandard::snprintf(buf, 5, "%i", i);
+  OFCHECK((count == 5) && (four ==  buf));
+
+  // ...until finally the formatted string fits completely into the buffer.
+  memcpy(buf, s, 10);
+  count = OFStandard::snprintf(buf, 10, "%i", i);
+  OFCHECK((count == 5) && (five ==  buf));
 }

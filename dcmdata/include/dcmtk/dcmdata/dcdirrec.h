@@ -1,6 +1,6 @@
 /*
  *
- *  Copyright (C) 1994-2016, OFFIS e.V.
+ *  Copyright (C) 1994-2018, OFFIS e.V.
  *  All rights reserved.  See COPYRIGHT file for details.
  *
  *  This software and supporting documentation were developed by
@@ -105,7 +105,7 @@ typedef enum {
     ERT_HangingProtocol = 35,
     /// stereometric relationships
     ERT_Stereometric = 36,
-    /// HL7 structured document
+    /// HL7 structured document (retired)
     ERT_HL7StrucDoc = 37,
     /// palette
     ERT_Palette = 38,
@@ -461,7 +461,7 @@ protected:
 
     // side-effect-free conversion routines:
     E_DirRecType        recordNameToType(const char *recordTypeName);
-    char*               buildFileName(const char *origName, char *destName);
+    char*               buildFileName(const char *origName, char *destName, size_t len) const;
     OFCondition         checkHierarchy(const E_DirRecType upperRecord,
                                        const E_DirRecType lowerRecord);
 

@@ -1,6 +1,6 @@
 /*
  *
- *  Copyright (C) 1999-2017, OFFIS e.V.
+ *  Copyright (C) 1999-2018, OFFIS e.V.
  *  All rights reserved.  See COPYRIGHT file for details.
  *
  *  This software and supporting documentation were developed by
@@ -42,6 +42,7 @@ END_EXTERN_C
 #include "dcmtk/dcmnet/diutil.h"
 #include "dcmtk/dcmdata/cmdlnarg.h"
 #include "dcmtk/ofstd/ofconapp.h"
+#include "dcmtk/ofstd/ofstd.h"
 #include "dcmtk/dcmpstat/dvpshlp.h"     /* for class DVPSHelper */
 #include "dcmtk/dcmqrdb/dcmqrdbi.h"     /* for LOCK_IMAGE_FILES */
 #include "dcmtk/dcmqrdb/dcmqrdbs.h"     /* for DcmQueryRetrieveDatabaseStatus */
@@ -121,8 +122,9 @@ static OFCondition sendImage(T_ASC_Association *assoc, const char *sopClass, con
     /* start store */
     OFBitmanipTemplate<char>::zeroMem((char *)&req, sizeof(req));
     req.MessageID = assoc->nextMsgID++;
-    strcpy(req.AffectedSOPClassUID, sopClass);
-    strcpy(req.AffectedSOPInstanceUID, sopInstance);
+
+    OFStandard::strlcpy(req.AffectedSOPClassUID, sopClass, sizeof(req.AffectedSOPClassUID));
+    OFStandard::strlcpy(req.AffectedSOPInstanceUID, sopInstance, sizeof(req.AffectedSOPInstanceUID));
     req.DataSetType = DIMSE_DATASET_PRESENT;
     req.Priority = DIMSE_PRIORITY_MEDIUM;
 
@@ -249,7 +251,7 @@ static OFCondition sendStudy(
 
     while (dbStatus.status() == STATUS_Pending)
     {
-      cond = handle.nextMoveResponse(sopClass, sopInstance, imgFile, &nRemaining, &dbStatus);
+      cond = handle.nextMoveResponse(sopClass, sizeof(sopClass), sopInstance, sizeof(sopInstance), imgFile, sizeof(imgFile), &nRemaining, &dbStatus);
       if (cond.bad()) return cond;
 
       if (dbStatus.status() == STATUS_Pending)
@@ -321,6 +323,9 @@ static OFCondition addAllStoragePresentationContexts(T_ASC_Parameters *params, i
 int main(int argc, char *argv[])
 {
     OFStandard::initializeNetwork();
+#ifdef WITH_OPENSSL
+    DcmTLSTransportLayer::initializeOpenSSL();
+#endif
 
     OFString temp_str;
 
@@ -366,7 +371,7 @@ int main(int argc, char *argv[])
             COUT << "- ZLIB, Version " << zlibVersion() << OFendl;
 #endif
 #ifdef WITH_OPENSSL
-            COUT << "- " << OPENSSL_VERSION_TEXT << OFendl;
+            COUT << "- " << DcmTLSTransportLayer::getOpenSSLVersionName() << OFendl;
 #endif
             return 0;
          }
@@ -480,39 +485,9 @@ int main(int argc, char *argv[])
     if (tlsCACertificateFolder==NULL) tlsCACertificateFolder = ".";
 
     /* key file format */
-    int keyFileFormat = SSL_FILETYPE_PEM;
-    if (! dvi.getTLSPEMFormat()) keyFileFormat = SSL_FILETYPE_ASN1;
+    DcmKeyFileFormat keyFileFormat = DCF_Filetype_PEM;
+    if (! dvi.getTLSPEMFormat()) keyFileFormat = DCF_Filetype_ASN1;
 
-    /* ciphersuites */
-#if OPENSSL_VERSION_NUMBER >= 0x0090700fL
-    OFString tlsCiphersuites(TLS1_TXT_RSA_WITH_AES_128_SHA ":" SSL3_TXT_RSA_DES_192_CBC3_SHA);
-#else
-    OFString tlsCiphersuites(SSL3_TXT_RSA_DES_192_CBC3_SHA);
-#endif
-    Uint32 tlsNumberOfCiphersuites = dvi.getTargetNumberOfCipherSuites(opt_target);
-    if (tlsNumberOfCiphersuites > 0)
-    {
-      tlsCiphersuites.clear();
-      OFString currentSuite;
-      const char *currentOpenSSL;
-      for (Uint32 ui=0; ui<tlsNumberOfCiphersuites; ui++)
-      {
-        dvi.getTargetCipherSuite(opt_target, ui, currentSuite);
-        if (NULL == (currentOpenSSL = DcmTLSTransportLayer::findOpenSSLCipherSuiteName(currentSuite.c_str())))
-        {
-          OFLOG_FATAL(dcmpssndLogger, "ciphersuite '" << currentSuite << "' is unknown. Known ciphersuites are:");
-          unsigned long numSuites = DcmTLSTransportLayer::getNumberOfCipherSuites();
-          for (unsigned long cs=0; cs < numSuites; cs++)
-          {
-            OFLOG_FATAL(dcmpssndLogger, "    " << DcmTLSTransportLayer::getTLSCipherSuiteName(cs));
-          }
-          return 1;
-        } else {
-          if (!tlsCiphersuites.empty()) tlsCiphersuites += ":";
-          tlsCiphersuites += currentOpenSSL;
-        }
-      }
-    }
 #else
     if (useTLS)
     {
@@ -573,37 +548,6 @@ int main(int argc, char *argv[])
     verboseParameters << "\tTLS             : ";
     if (useTLS) verboseParameters << "enabled" << OFendl; else verboseParameters << "disabled" << OFendl;
 
-#ifdef WITH_OPENSSL
-    if (useTLS)
-    {
-      verboseParameters << "\tTLS certificate : " << tlsCertificateFile << OFendl
-           << "\tTLS key file    : " << tlsPrivateKeyFile << OFendl
-           << "\tTLS DH params   : " << tlsDHParametersFile << OFendl
-           << "\tTLS PRNG seed   : " << tlsRandomSeedFile << OFendl
-           << "\tTLS CA directory: " << tlsCACertificateFolder << OFendl
-           << "\tTLS ciphersuites: " << tlsCiphersuites << OFendl
-           << "\tTLS key format  : ";
-      if (keyFileFormat == SSL_FILETYPE_PEM) verboseParameters << "PEM" << OFendl; else verboseParameters << "DER" << OFendl;
-      verboseParameters << "\tTLS cert verify : ";
-      switch (tlsCertVerification)
-      {
-          case DCV_checkCertificate:
-            verboseParameters << "verify" << OFendl;
-            break;
-          case DCV_ignoreCertificate:
-            verboseParameters << "ignore" << OFendl;
-            break;
-          default:
-            verboseParameters << "require" << OFendl;
-            break;
-      }
-    }
-#endif
-
-    verboseParameters << OFStringStream_ends;
-    OFSTRINGSTREAM_GETOFSTRING(verboseParameters, verboseParametersString)
-    OFLOG_INFO(dcmpssndLogger, verboseParametersString);
-
     /* open database */
     const char *dbfolder = dvi.getDatabaseFolder();
 
@@ -622,10 +566,38 @@ int main(int argc, char *argv[])
     DcmTLSTransportLayer *tLayer = NULL;
     if (useTLS)
     {
-      tLayer = new DcmTLSTransportLayer(DICOM_APPLICATION_REQUESTOR, tlsRandomSeedFile.c_str());
+      tLayer = new DcmTLSTransportLayer(NET_REQUESTOR, tlsRandomSeedFile.c_str(), OFFalse);
       if (tLayer == NULL)
       {
         OFLOG_FATAL(dcmpssndLogger, "unable to create TLS transport layer");
+        return 1;
+      }
+
+      // determine TLS profile
+      OFString profileName;
+      const char *profileNamePtr = dvi.getTargetTLSProfile(opt_target);
+      if (profileNamePtr) profileName = profileNamePtr;
+      DcmTLSSecurityProfile tlsProfile = TSP_Profile_BCP195;  // default
+      if (profileName == "BCP195") tlsProfile = TSP_Profile_BCP195;
+      else if (profileName == "BCP195-ND") tlsProfile = TSP_Profile_BCP195_ND;
+      else if (profileName == "AES") tlsProfile = TSP_Profile_AES;
+      else if (profileName == "BASIC") tlsProfile = TSP_Profile_Basic;
+      else if (profileName == "NULL") tlsProfile = TSP_Profile_IHE_ATNA_Unencrypted;
+      else
+      {
+        OFLOG_WARN(dcmpssndLogger, "unknown TLS profile '" << profileName << "', ignoring");
+      }
+
+      if (TCS_ok != tLayer->setTLSProfile(tlsProfile))
+      {
+        OFLOG_FATAL(dcmpssndLogger, "unable to select the TLS security profile");
+        return 1;
+      }
+
+      // activate cipher suites
+      if (TCS_ok != tLayer->activateCipherSuites())
+      {
+        OFLOG_FATAL(dcmpssndLogger, "unable to activate the selected list of TLS ciphersuites");
         return 1;
       }
 
@@ -657,11 +629,6 @@ int main(int argc, char *argv[])
           return 1;
         }
       }
-      if (TCS_ok != tLayer->setCipherSuites(tlsCiphersuites.c_str()))
-      {
-        OFLOG_FATAL(dcmpssndLogger, "unable to set selected cipher suites");
-        return 1;
-      }
 
       tLayer->setCertificateVerification(tlsCertVerification);
 
@@ -672,7 +639,37 @@ int main(int argc, char *argv[])
       tLayer->addPRNGseed(randomUID, strlen(randomUID));
     }
 
+    if (useTLS)
+    {
+      OFString cslist;
+      if (tLayer) tLayer->getListOfCipherSuitesForOpenSSL(cslist);
+      verboseParameters << "\tTLS certificate : " << tlsCertificateFile << OFendl
+           << "\tTLS key file    : " << tlsPrivateKeyFile << OFendl
+           << "\tTLS DH params   : " << tlsDHParametersFile << OFendl
+           << "\tTLS PRNG seed   : " << tlsRandomSeedFile << OFendl
+           << "\tTLS CA directory: " << tlsCACertificateFolder << OFendl
+           << "\tTLS ciphersuites: " << cslist << OFendl
+           << "\tTLS key format  : ";
+      if (keyFileFormat == DCF_Filetype_PEM) verboseParameters << "PEM" << OFendl; else verboseParameters << "DER" << OFendl;
+      verboseParameters << "\tTLS cert verify : ";
+      switch (tlsCertVerification)
+      {
+          case DCV_checkCertificate:
+            verboseParameters << "verify" << OFendl;
+            break;
+          case DCV_ignoreCertificate:
+            verboseParameters << "ignore" << OFendl;
+            break;
+          default:
+            verboseParameters << "require" << OFendl;
+            break;
+      }
+    }
 #endif
+
+    verboseParameters << OFStringStream_ends;
+    OFSTRINGSTREAM_GETOFSTRING(verboseParameters, verboseParametersString)
+    OFLOG_INFO(dcmpssndLogger, verboseParametersString);
 
     /* open network connection */
     T_ASC_Network *net=NULL;

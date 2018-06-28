@@ -1,6 +1,6 @@
 /*
  *
- *  Copyright (C) 1998-2016, OFFIS e.V.
+ *  Copyright (C) 1998-2018, OFFIS e.V.
  *  All rights reserved.  See COPYRIGHT file for details.
  *
  *  This software and supporting documentation were developed by
@@ -29,8 +29,22 @@
 
 #include "dcmtk/ofstd/oftypes.h"
 #include "dcmtk/ofstd/ofcond.h"
-
+#include "dcmtk/oflog/oflog.h"
 #include "dcmtk/dcmsign/sidefine.h"
+
+/*
+** Logging
+*/
+
+extern DCMTK_DCMSIGN_EXPORT OFLogger DCM_dcmsignLogger;
+
+#define DCMSIGN_TRACE(msg) OFLOG_TRACE(DCM_dcmsignLogger, msg)
+#define DCMSIGN_DEBUG(msg) OFLOG_DEBUG(DCM_dcmsignLogger, msg)
+#define DCMSIGN_INFO(msg)  OFLOG_INFO(DCM_dcmsignLogger, msg)
+#define DCMSIGN_WARN(msg)  OFLOG_WARN(DCM_dcmsignLogger, msg)
+#define DCMSIGN_ERROR(msg) OFLOG_ERROR(DCM_dcmsignLogger, msg)
+#define DCMSIGN_FATAL(msg) OFLOG_FATAL(DCM_dcmsignLogger, msg)
+
 
 // DICOM defined terms for MAC algorithms, certificate and timestamp types
 #define SI_DEFTERMS_RIPEMD160 "RIPEMD160"
@@ -44,6 +58,8 @@
 
 
 /** type of key for public key cryptosystem
+ *  @remark this enum is only available if DCMTK is compiled with
+ *  OpenSSL support enabled.
  */
 enum E_KeyType
 {
@@ -62,6 +78,8 @@ enum E_KeyType
 
 
 /** type of MAC algorithm
+ *  @remark this enum is only available if DCMTK is compiled with
+ *  OpenSSL support enabled.
  */
 enum E_MACType
 {
@@ -89,50 +107,78 @@ enum E_MACType
  */
  
 /// object initialization failed
+/// @remark this constant is only available if DCMTK is compiled with
+/// OpenSSL support enabled.
 extern DCMTK_DCMSIGN_EXPORT const OFConditionConst SI_EC_InitializationFailed;
 
 /// an OpenSSL call has failed
+/// @remark this constant is only available if DCMTK is compiled with
+/// OpenSSL support enabled.
 extern DCMTK_DCMSIGN_EXPORT const OFConditionConst SI_EC_OpenSSLFailure;
 
 /// file cannot be read
+/// @remark this constant is only available if DCMTK is compiled with
+/// OpenSSL support enabled.
 extern DCMTK_DCMSIGN_EXPORT const OFConditionConst SI_EC_CannotRead;
 
 /// unable to use the selected transfer syntax for MAC computation
+/// @remark this constant is only available if DCMTK is compiled with
+/// OpenSSL support enabled.
 extern DCMTK_DCMSIGN_EXPORT const OFConditionConst SI_EC_WrongTransferSyntax;
 
 /// no more MAC ID numbers available
+/// @remark this constant is only available if DCMTK is compiled with
+/// OpenSSL support enabled.
 extern DCMTK_DCMSIGN_EXPORT const OFConditionConst SI_EC_MacIDsExhausted;
 
 /// certificate and private key do not match
+/// @remark this constant is only available if DCMTK is compiled with
+/// OpenSSL support enabled.
 extern DCMTK_DCMSIGN_EXPORT const OFConditionConst SI_EC_CertificateDoesNotMatchPrivateKey;
 
 /// MAC algorithm not allowed for the current security profile
+/// @remark this constant is only available if DCMTK is compiled with
+/// OpenSSL support enabled.
 extern DCMTK_DCMSIGN_EXPORT const OFConditionConst SI_EC_MacDoesNotMatchProfile;
 
 /// Signature algorithm not allowed for the current security profile
+/// @remark this constant is only available if DCMTK is compiled with
+/// OpenSSL support enabled.
 extern DCMTK_DCMSIGN_EXPORT const OFConditionConst SI_EC_AlgorithmDoesNotMatchProfile;
 
 /// Transfer syntax not allowed for the current security profile
+/// @remark this constant is only available if DCMTK is compiled with
+/// OpenSSL support enabled.
 extern DCMTK_DCMSIGN_EXPORT const OFConditionConst SI_EC_TransferSyntaxDoesNotMatchProfile;
 
 /** signature verification failed because the certificate is missing
  *  or cannot be read (e.g. unsupported format)
+ *  @remark this constant is only available if DCMTK is compiled with
+ *  OpenSSL support enabled.
  */
 extern DCMTK_DCMSIGN_EXPORT const OFConditionConst SI_EC_VerificationFailed_NoCertificate;
 
 /// signature verification failed because the corresponding MAC parameters item could not be found or is incomplete
+/// @remark this constant is only available if DCMTK is compiled with
+/// OpenSSL support enabled.
 extern DCMTK_DCMSIGN_EXPORT const OFConditionConst SI_EC_VerificationFailed_NoMAC;
 
 /// signature verification failed because the corresponding signature item is incomplete
+/// @remark this constant is only available if DCMTK is compiled with
+/// OpenSSL support enabled.
 extern DCMTK_DCMSIGN_EXPORT const OFConditionConst SI_EC_VerificationFailed_NoSignature;
 
 /// signature verification failed because the MAC algorithm is not supported
+/// @remark this constant is only available if DCMTK is compiled with
+/// OpenSSL support enabled.
 extern DCMTK_DCMSIGN_EXPORT const OFConditionConst SI_EC_VerificationFailed_UnsupportedMACAlgorithm;
 
 /// signature verification failed because the signature is invalid (document corrupted)
 extern DCMTK_DCMSIGN_EXPORT const OFConditionConst SI_EC_VerificationFailed_Corrupted;
 
 /// signature verification failed because the certificate was issued by an untrusted (unknown) CA
+/// @remark this constant is only available if DCMTK is compiled with
+/// OpenSSL support enabled.
 extern DCMTK_DCMSIGN_EXPORT const OFConditionConst SI_EC_VerificationFailed_NoTrust;
 
 #endif

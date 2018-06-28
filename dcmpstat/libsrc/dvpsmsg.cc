@@ -1,6 +1,6 @@
 /*
  *
- *  Copyright (C) 1998-2017, OFFIS e.V.
+ *  Copyright (C) 1998-2018, OFFIS e.V.
  *  All rights reserved.  See COPYRIGHT file for details.
  *
  *  This software and supporting documentation were developed by
@@ -34,6 +34,7 @@
 #include "dcmtk/dcmdata/dcswap.h"      /* for swapIfNecessary() */
 #include "dcmtk/dcmnet/dcmtrans.h"    /* for class DcmTransportConnection */
 #include "dcmtk/ofstd/ofsockad.h"
+#include "dcmtk/ofstd/ofstd.h"
 
 /* --------------- class DVPSIPCMessage --------------- */
 
@@ -109,9 +110,9 @@ DVPSIPCMessage& DVPSIPCMessage::operator=(const DVPSIPCMessage& copy)
   return *this;
 }
 
-void DVPSIPCMessage::resizePayload(Uint32 i)
+void DVPSIPCMessage::resizePayload(size_t i)
 {
-  Uint32 requiredSize = payloadUsed+i;
+  size_t requiredSize = payloadUsed+i;
   if (requiredSize < payloadAllocated) return;
 
   while (payloadAllocated < requiredSize) payloadAllocated += PAYLOAD_ALLOCATION_UNIT;
@@ -124,17 +125,18 @@ void DVPSIPCMessage::resizePayload(Uint32 i)
 
 void DVPSIPCMessage::addStringToPayload(const char *str)
 {
-  Uint32 length = 0;
-  if (str) length = OFstatic_cast(Uint32, strlen(str)); else str = "";
+  size_t length = 0;
+  if (str) length = strlen(str); else str = "";
   Uint32 padBytes = 4 - (length % 4);
-  resizePayload(sizeof(Uint32)+length+padBytes);
+  size_t sizeNeeded = sizeof(Uint32)+length+padBytes;
+  resizePayload(sizeNeeded);
 
   // write string length
-  addIntToPayload(length+padBytes);
+  addIntToPayload(OFstatic_cast(Uint32, length+padBytes));
 
   // write string
-  strcpy((char *)(payload + payloadUsed), str);
-  payloadUsed += length;
+  OFStandard::strlcpy((char *)(payload + payloadUsed), str, (length+padBytes));
+  payloadUsed += OFstatic_cast(Uint32, length);
 
   // write pad bytes
   for (Uint32 i=0; i < padBytes; i++) *(payload + payloadUsed++) = 0;

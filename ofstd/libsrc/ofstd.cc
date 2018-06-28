@@ -264,6 +264,69 @@ size_t OFStandard::my_strlcat(char *dst, const char *src, size_t siz)
 }
 #endif /* HAVE_STRLCAT */
 
+int OFStandard::snprintf(char *str, size_t size, const char *format, ...)
+{
+    // we emulate snprintf() via vsnprintf().
+    int count;
+    va_list ap;
+    va_start(ap, format);
+    count = OFStandard::vsnprintf(str, size, format, ap);
+    va_end(ap);
+    return count;
+}
+
+int OFStandard::vsnprintf(char *str, size_t size, const char *format, va_list ap)
+{
+#ifdef _MSC_VER
+#if _MSC_VER < 1900
+    // Visual Studio versions 2005 to 2013 do not have a C99 compliant
+    // vsnprintf(), but they have _snprintf(), which can be used to emulate it.
+    int count = -1;
+
+    if (size != 0)
+        count = _vsnprintf_s(str, size, _TRUNCATE, format, ap);
+    if (count == -1)
+        count = _vscprintf(format, ap);
+
+    return count;
+#else /* _MSC_VER < 1900 */
+    // Visual Studio 2015 and newer has a C99 compliant vsnprintf().
+    return ::vsnprintf(str, size, format, ap);
+#endif /* _MSC_VER < 1900 */
+#else /* _MSC_VER */
+#ifdef HAVE_VSNPRINTF
+    return ::vsnprintf(str, size, format, ap);
+#else /* HAVE_VSNPRINTF */
+#ifdef DCMTK_ENABLE_UNSAFE_VSNPRINTF
+    // This implementation internally uses sprintf (which is inherently unsafe).
+    // It allocates a buffer that is 1 kByte larger than "size",
+    // formats the string into that buffer, and then uses strlcpy() to
+    // copy the formatted string into the output buffer, truncating if necessary.
+    // This will work in most cases, since few snprintf calls should overrun
+    // the provided buffer by more than 1K, but it can be easily abused by
+    // a malicious attacker to cause a buffer overrun.
+    //
+    // Therefore, this implementation should only be used as a "last resort"
+    // and we strongly advise against using it in production code.
+    // The macro "DCMTK_ENABLE_UNSAFE_VSNPRINTF" must explicitly be defined
+    // by the used to enable this implementation.
+    int count = -1;
+    if (size != 0)
+    {
+      char *buf = new char[size+1024];
+      count = ::vsprintf(buf, format, ap);
+      OFStandard::strlcpy(str, buf, size);
+      delete[] buf;
+    }
+    return count;
+#warning Using unsafe implementation of vsnprintf(3)
+#else /* DCMTK_ENABLE_UNSAFE_VSNPRINTF */
+    return -1;
+#error vsnprintf(3) not found. Use different compiler or compile with DCMTK_ENABLE_UNSAFE_VSNPRINTF (unsafe!)
+#endif /* DCMTK_ENABLE_UNSAFE_VSNPRINTF */
+#endif /* HAVE_VSNPRINTF */
+#endif /* _MSC_VER */
+}
 
 #ifdef HAVE_PROTOTYPE_STRERROR_R
 /*
@@ -804,8 +867,9 @@ OFFilename &OFStandard::combineDirAndFilename(OFFilename &result,
             else {
                 const char *resValue = result.getCharPointer();
                 const size_t resLength = strlen(resValue); /* should never be 0 */
-                char *tmpString = new char[strLength + resLength + 1 + 1];
-                strcpy(tmpString, resValue);
+                const size_t buflen = strLength + resLength + 1 + 1;
+                char *tmpString = new char[buflen];
+                OFStandard::strlcpy(tmpString, resValue, buflen);
                 /* add path separator (if required) ... */
                 if (resValue[resLength - 1] != PATH_SEPARATOR)
                 {
@@ -813,7 +877,7 @@ OFFilename &OFStandard::combineDirAndFilename(OFFilename &result,
                     tmpString[resLength + 1] = '\0';
                 }
                 /* ...and file name */
-                strcat(tmpString, strValue);
+                OFStandard::strlcat(tmpString, strValue, buflen);
                 result.set(tmpString);
                 delete[] tmpString;
             }
@@ -895,9 +959,10 @@ OFCondition OFStandard::removeRootDirFromPathname(OFFilename &result,
             if (strncmp(rootValue, pathValue, rootLength) == 0)
             {
                 /* create temporary buffer for destination string */
-                char *tmpString = new char[pathLength - rootLength + 1];
+                size_t buflen = pathLength - rootLength + 1;
+                char *tmpString = new char[buflen];
                 /* remove root dir prefix from path name */
-                strcpy(tmpString, pathValue + rootLength);
+                OFStandard::strlcpy(tmpString, pathValue + rootLength, buflen);
                 /* remove leading path separator (if present) */
                 if (!allowLeadingPathSeparator && (tmpString[0] == PATH_SEPARATOR))
                     result.set(tmpString + 1);
@@ -947,10 +1012,11 @@ OFFilename &OFStandard::appendFilenameExtension(OFFilename &result,
         size_t namLength = (namValue == NULL) ? 0 : strlen(namValue);
         size_t extLength = (extValue == NULL) ? 0 : strlen(extValue);
         /* create temporary buffer for destination string */
-        char *tmpString = new char[namLength + extLength + 1];
-        strcpy(tmpString, (namValue == NULL) ? "" : namValue);
+        size_t buflen = namLength + extLength + 1;
+        char *tmpString = new char[buflen];
+        OFStandard::strlcpy(tmpString, (namValue == NULL) ? "" : namValue, buflen);
         if (extValue != NULL)
-            strcat(tmpString, extValue);
+            OFStandard::strlcat(tmpString, extValue, buflen);
         result.set(tmpString);
         delete[] tmpString;
     }

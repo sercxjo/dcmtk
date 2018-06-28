@@ -1,6 +1,6 @@
 /*
  *
- *  Copyright (C) 1994-2017, OFFIS e.V.
+ *  Copyright (C) 1994-2018, OFFIS e.V.
  *  All rights reserved.  See COPYRIGHT file for details.
  *
  *  This software and supporting documentation were developed by
@@ -27,6 +27,7 @@
 #include "dcmtk/ofstd/ofstdinc.h"
 
 #include "dcmtk/ofstd/oftest.h"
+#include "dcmtk/ofstd/ofrand.h"
 #include "dcmtk/dcmdata/dctk.h"
 #include "dcmtk/dcmdata/dcuid.h"       /* for dcmtk version name */
 #include "dcmtk/dcmdata/dcostrmz.h"    /* for dcmZlibCompressionLevel */
@@ -62,7 +63,7 @@ static void createTestDataset(DcmDataset *dset, unsigned char *buffer)
   dset->insert(elem);
 }
 
-static OFCondition sequentialNonOverlappingRead(DcmElement *delem, DcmFileCache *dcache, unsigned char *buffer)
+static OFCondition sequentialNonOverlappingRead(OFRandom& rnd, DcmElement *delem, DcmFileCache *dcache, unsigned char *buffer)
 {
     unsigned char *target = new unsigned char[BUFSIZE];
     Uint32 offset = 0;
@@ -71,7 +72,7 @@ static OFCondition sequentialNonOverlappingRead(DcmElement *delem, DcmFileCache 
 
     while (offset < BUFSIZE)
     {
-      bytes_to_read = (rand() % 20)+1;  // read 1 to 20 bytes
+      bytes_to_read = (rnd.getRND32() % 20)+1;  // read 1 to 20 bytes
 
       // make sure we don't attempt to read beyond the end of the attribute value
       if (offset + bytes_to_read > BUFSIZE) bytes_to_read = BUFSIZE - offset;
@@ -113,7 +114,7 @@ static OFCondition sequentialNonOverlappingRead(DcmElement *delem, DcmFileCache 
     return EC_Normal;
 }
 
-static OFCondition sequentialOverlappingRead(DcmElement *delem, DcmFileCache *dcache, unsigned char *buffer)
+static OFCondition sequentialOverlappingRead(OFRandom& rnd, DcmElement *delem, DcmFileCache *dcache, unsigned char *buffer)
 {
     unsigned char *target = new unsigned char[BUFSIZE];
     Uint32 offset = 0;
@@ -122,7 +123,7 @@ static OFCondition sequentialOverlappingRead(DcmElement *delem, DcmFileCache *dc
 
     while (offset < BUFSIZE)
     {
-      bytes_to_read = (rand() % 20)+1;  // read 1 to 20 bytes
+      bytes_to_read = (rnd.getRND32() % 20)+1;  // read 1 to 20 bytes
 
       // make sure we don't attempt to read beyond the end of the attribute value
       if (offset + bytes_to_read > BUFSIZE) bytes_to_read = BUFSIZE - offset;
@@ -157,13 +158,13 @@ static OFCondition sequentialOverlappingRead(DcmElement *delem, DcmFileCache *dc
       }
 
       offset += bytes_to_read;
-      if ((offset > 4) && (offset < BUFSIZE)) offset -= (rand() % 4); // let the read operations overlap by 0-3 bytes
+      if ((offset > 4) && (offset < BUFSIZE)) offset -= (rnd.getRND32() % 4); // let the read operations overlap by 0-3 bytes
     }
     delete[] target;
     return EC_Normal;
 }
 
-static OFCondition randomRead(DcmElement *delem, DcmFileCache *dcache, unsigned char *buffer)
+static OFCondition randomRead(OFRandom& rnd, DcmElement *delem, DcmFileCache *dcache, unsigned char *buffer)
 {
     unsigned char *target = new unsigned char[BUFSIZE];
     Uint32 offset = 0;
@@ -172,8 +173,8 @@ static OFCondition randomRead(DcmElement *delem, DcmFileCache *dcache, unsigned 
 
     for (int i=1000; i; --i)
     {
-      bytes_to_read = (rand() % 20)+1;  // read 1 to 20 bytes
-      offset = rand() % BUFSIZE;
+      bytes_to_read = (rnd.getRND32() % 20)+1;  // read 1 to 20 bytes
+      offset = rnd.getRND32() % BUFSIZE;
 
       // make sure we don't attempt to read beyond the end of the attribute value
       if (offset + bytes_to_read > BUFSIZE) bytes_to_read = BUFSIZE - offset;
@@ -213,7 +214,7 @@ static OFCondition randomRead(DcmElement *delem, DcmFileCache *dcache, unsigned 
     return EC_Normal;
 }
 
-static OFCondition sequentialNonOverlappingRead(DcmDataset *dset, unsigned char *buffer)
+static OFCondition sequentialNonOverlappingRead(OFRandom& rnd, DcmDataset *dset, unsigned char *buffer)
 {
   DcmFileCache cache;
   DcmElement *delem = NULL;
@@ -222,30 +223,30 @@ static OFCondition sequentialNonOverlappingRead(DcmDataset *dset, unsigned char 
   cond = dset->findAndGetElement(DCM_EncapsulatedDocument, delem);
   if (cond.bad()) return cond;
 
-  cond = sequentialNonOverlappingRead(delem, &cache, buffer);
+  cond = sequentialNonOverlappingRead(rnd, delem, &cache, buffer);
   if (cond.bad()) return cond;
 
   cond = dset->findAndGetElement(DCM_RWavePointer, delem);
   if (cond.bad()) return cond;
 
-  cond = sequentialNonOverlappingRead(delem, &cache, buffer);
+  cond = sequentialNonOverlappingRead(rnd, delem, &cache, buffer);
   if (cond.bad()) return cond;
 
   cond = dset->findAndGetElement(DCM_TableOfPixelValues, delem);
   if (cond.bad()) return cond;
 
-  cond = sequentialNonOverlappingRead(delem, &cache, buffer);
+  cond = sequentialNonOverlappingRead(rnd, delem, &cache, buffer);
   if (cond.bad()) return cond;
 
   cond = dset->findAndGetElement(DCM_TableOfYBreakPoints, delem);
   if (cond.bad()) return cond;
 
-  cond = sequentialNonOverlappingRead(delem, &cache, buffer);
+  cond = sequentialNonOverlappingRead(rnd, delem, &cache, buffer);
 
   return cond;
 }
 
-static OFCondition sequentialOverlappingRead(DcmDataset *dset, unsigned char *buffer)
+static OFCondition sequentialOverlappingRead(OFRandom& rnd, DcmDataset *dset, unsigned char *buffer)
 {
   DcmFileCache cache;
   DcmElement *delem = NULL;
@@ -254,30 +255,30 @@ static OFCondition sequentialOverlappingRead(DcmDataset *dset, unsigned char *bu
   cond = dset->findAndGetElement(DCM_EncapsulatedDocument, delem);
   if (cond.bad()) return cond;
 
-  cond = sequentialOverlappingRead(delem, &cache, buffer);
+  cond = sequentialOverlappingRead(rnd, delem, &cache, buffer);
   if (cond.bad()) return cond;
 
   cond = dset->findAndGetElement(DCM_RWavePointer, delem);
   if (cond.bad()) return cond;
 
-  cond = sequentialOverlappingRead(delem, &cache, buffer);
+  cond = sequentialOverlappingRead(rnd, delem, &cache, buffer);
   if (cond.bad()) return cond;
 
   cond = dset->findAndGetElement(DCM_TableOfPixelValues, delem);
   if (cond.bad()) return cond;
 
-  cond = sequentialOverlappingRead(delem, &cache, buffer);
+  cond = sequentialOverlappingRead(rnd, delem, &cache, buffer);
   if (cond.bad()) return cond;
 
   cond = dset->findAndGetElement(DCM_TableOfYBreakPoints, delem);
   if (cond.bad()) return cond;
 
-  cond = sequentialOverlappingRead(delem, &cache, buffer);
+  cond = sequentialOverlappingRead(rnd, delem, &cache, buffer);
 
   return cond;
 }
 
-static OFCondition randomRead(DcmDataset *dset, unsigned char *buffer)
+static OFCondition randomRead(OFRandom& rnd, DcmDataset *dset, unsigned char *buffer)
 {
   DcmFileCache cache;
   DcmElement *delem = NULL;
@@ -286,25 +287,25 @@ static OFCondition randomRead(DcmDataset *dset, unsigned char *buffer)
   cond = dset->findAndGetElement(DCM_EncapsulatedDocument, delem);
   if (cond.bad()) return cond;
 
-  cond = randomRead(delem, &cache, buffer);
+  cond = randomRead(rnd, delem, &cache, buffer);
   if (cond.bad()) return cond;
 
   cond = dset->findAndGetElement(DCM_RWavePointer, delem);
   if (cond.bad()) return cond;
 
-  cond = randomRead(delem, &cache, buffer);
+  cond = randomRead(rnd, delem, &cache, buffer);
   if (cond.bad()) return cond;
 
   cond = dset->findAndGetElement(DCM_TableOfPixelValues, delem);
   if (cond.bad()) return cond;
 
-  cond = randomRead(delem, &cache, buffer);
+  cond = randomRead(rnd, delem, &cache, buffer);
   if (cond.bad()) return cond;
 
   cond = dset->findAndGetElement(DCM_TableOfYBreakPoints, delem);
   if (cond.bad()) return cond;
 
-  cond = randomRead(delem, &cache, buffer);
+  cond = randomRead(rnd, delem, &cache, buffer);
 
   return cond;
 }
@@ -321,14 +322,14 @@ OFTEST(dcmdata_partialElementAccess)
 
     OFLOG_DEBUG(tstpreadLogger, "Creating test dataset");
 
+    OFRandom rnd;
     DcmFileFormat dfile;
 
     unsigned char *buffer = new unsigned char[BUFSIZE];
     unsigned char *bufptr = buffer;
-    srand(OFstatic_cast(unsigned int, time(NULL)));
     for (int i = BUFSIZE; i; --i)
     {
-      *bufptr++ = OFstatic_cast(unsigned char, rand());
+      *bufptr++ = OFstatic_cast(unsigned char, rnd.getRND32());
     }
 
     createTestDataset(dfile.getDataset(), buffer);
@@ -365,42 +366,42 @@ OFTEST(dcmdata_partialElementAccess)
     // testing sequential, non overlapping reads of partial element values
     OFLOG_DEBUG(tstpreadLogger, "Testing sequential, non overlapping reads of partial element values");
 
-    cond = sequentialNonOverlappingRead(dfile_be.getDataset(), buffer);
+    cond = sequentialNonOverlappingRead(rnd, dfile_be.getDataset(), buffer);
     if (cond.bad()) { OFCHECK_FAIL(cond.text()); }
 
-    cond = sequentialNonOverlappingRead(dfile_le.getDataset(), buffer);
+    cond = sequentialNonOverlappingRead(rnd, dfile_le.getDataset(), buffer);
     if (cond.bad()) { OFCHECK_FAIL(cond.text()); }
 
 #ifdef WITH_ZLIB
-    cond = sequentialNonOverlappingRead(dfile_df.getDataset(), buffer);
+    cond = sequentialNonOverlappingRead(rnd, dfile_df.getDataset(), buffer);
     if (cond.bad()) { OFCHECK_FAIL(cond.text()); }
 #endif
 
     // testing random reads of partial element values
     OFLOG_DEBUG(tstpreadLogger, "Testing random reads of partial element values");
 
-    cond = randomRead(dfile_be.getDataset(), buffer);
+    cond = randomRead(rnd, dfile_be.getDataset(), buffer);
     if (cond.bad()) { OFCHECK_FAIL(cond.text()); }
 
-    cond = randomRead(dfile_le.getDataset(), buffer);
+    cond = randomRead(rnd, dfile_le.getDataset(), buffer);
     if (cond.bad()) { OFCHECK_FAIL(cond.text()); }
 
 #ifdef WITH_ZLIB
-    cond = randomRead(dfile_df.getDataset(), buffer);
+    cond = randomRead(rnd, dfile_df.getDataset(), buffer);
     if (cond.bad()) { OFCHECK_FAIL(cond.text()); }
 #endif
 
     // testing overlapping reads of partial element values
     OFLOG_DEBUG(tstpreadLogger, "Testing overlapping reads of partial element values");
 
-    cond = sequentialOverlappingRead(dfile_be.getDataset(), buffer);
+    cond = sequentialOverlappingRead(rnd, dfile_be.getDataset(), buffer);
     if (cond.bad()) { OFCHECK_FAIL(cond.text()); }
 
-    cond = sequentialOverlappingRead(dfile_le.getDataset(), buffer);
+    cond = sequentialOverlappingRead(rnd, dfile_le.getDataset(), buffer);
     if (cond.bad()) { OFCHECK_FAIL(cond.text()); }
 
 #ifdef WITH_ZLIB
-    cond = sequentialOverlappingRead(dfile_df.getDataset(), buffer);
+    cond = sequentialOverlappingRead(rnd, dfile_df.getDataset(), buffer);
     if (cond.bad()) { OFCHECK_FAIL(cond.text()); }
 #endif
 

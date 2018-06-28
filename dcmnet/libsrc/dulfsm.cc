@@ -940,10 +940,9 @@ AE_3_AssociateConfirmationAccept(PRIVATE_NETWORKKEY ** /*network*/,
         free(buffer);
         if (cond.bad()) return makeDcmnetSubCondition(DULC_ILLEGALPDU, OF_error, "DUL Illegal or ill-formed PDU", cond);
 
-        (void) strcpy(service->respondingAPTitle, assoc.calledAPTitle);
-        (void) strcpy(service->callingAPTitle, assoc.callingAPTitle);
-        (void) strcpy(service->applicationContextName,
-                      assoc.applicationContext.data);
+        OFStandard::strlcpy(service->respondingAPTitle, assoc.calledAPTitle, sizeof(service->respondingAPTitle));
+        OFStandard::strlcpy(service->callingAPTitle, assoc.callingAPTitle, sizeof(service->callingAPTitle));
+        OFStandard::strlcpy(service->applicationContextName, assoc.applicationContext.data, sizeof(service->applicationContextName));
 
         if ((service->acceptedPresentationContext = LST_Create()) == NULL) return EC_MemoryExhausted;
 
@@ -961,8 +960,9 @@ AE_3_AssociateConfirmationAccept(PRIVATE_NETWORKKEY ** /*network*/,
             requestedPresentationCtx = findPresentationCtx(
                  &service->requestedPresentationContext, prvCtx->contextID);
             if (requestedPresentationCtx != NULL) {
-                strcpy(userPresentationCtx->abstractSyntax,
-                       requestedPresentationCtx->abstractSyntax);
+                OFStandard::strlcpy(userPresentationCtx->abstractSyntax,
+                    requestedPresentationCtx->abstractSyntax,
+                    sizeof(userPresentationCtx->abstractSyntax));
                 userPresentationCtx->proposedSCRole =
                     requestedPresentationCtx->proposedSCRole;
             }
@@ -996,8 +996,8 @@ AE_3_AssociateConfirmationAccept(PRIVATE_NETWORKKEY ** /*network*/,
             }
             subItem = (DUL_SUBITEM*)LST_Head(&prvCtx->transferSyntaxList);
             if (subItem != NULL)
-                (void) strcpy(userPresentationCtx->acceptedTransferSyntax,
-                              subItem->data);
+                OFStandard::strlcpy(userPresentationCtx->acceptedTransferSyntax,
+                              subItem->data, sizeof(userPresentationCtx->acceptedTransferSyntax));
             LST_Enqueue(&service->acceptedPresentationContext, (LST_NODE*)userPresentationCtx);
 
             prvCtx = (PRV_PRESENTATIONCONTEXTITEM*)LST_Next(&assoc.presentationContextList);
@@ -1200,9 +1200,9 @@ AE_6_ExamineAssociateRequest(PRIVATE_NETWORKKEY ** /*network*/,
                 (*association)->protocolState = STATE3;
             return cond;
         }
-        (void) strcpy(service->calledAPTitle, assoc.calledAPTitle);
-        (void) strcpy(service->callingAPTitle, assoc.callingAPTitle);
-        (void) strcpy(service->applicationContextName, assoc.applicationContext.data);
+        OFStandard::strlcpy(service->calledAPTitle, assoc.calledAPTitle, sizeof(service->calledAPTitle));
+        OFStandard::strlcpy(service->callingAPTitle, assoc.callingAPTitle, sizeof(service->callingAPTitle));
+        OFStandard::strlcpy(service->applicationContextName, assoc.applicationContext.data, sizeof(service->applicationContextName));
 
         if ((service->requestedPresentationContext = LST_Create()) == NULL) return EC_MemoryExhausted;
         if (translatePresentationContextList(&assoc.presentationContextList,
@@ -1422,6 +1422,16 @@ DT_2_IndicatePData(PRIVATE_NETWORKKEY ** /*network*/,
         p += 4 + pdvLength;                 //move p so that it points to the next PDV (move p 4 bytes over the length field plus the amount of bytes which is captured in the PDV's length field (over presentation context.Id, message information header and data fragment))
         length -= 4 + pdvLength;            //update length (i.e. determine the length of the buffer which has not been evaluated yet.)
         pdvCount++;                         //increase counter by one, since we've found another PDV
+
+        // There must be at least a presentation context ID and a message
+        // control header (see below), else the calculation pdvLength - 2 below
+        // will underflow.
+        if (pdvLength < 2)
+        {
+           char buf[256];
+           sprintf(buf, "PDV with invalid length %lu encountered. This probably indicates a malformed P DATA PDU.", pdvLength);
+           return makeDcmnetCondition(DULC_ILLEGALPDULENGTH, OF_error, buf);
+        }
     }
 
     /* if after having counted the PDVs the length variable does not equal */
@@ -3268,6 +3278,9 @@ PRV_NextPDUType(PRIVATE_ASSOCIATIONKEY ** association, DUL_BLOCKOPTIONS block,
 **    If malloc fails, EC_MemoryExhausted is returned.
 **    Otherwise, the buffer must be released (free) by the caller!
 **
+**    This function is only used to receive incoming A-ASSOCIATE-RQ
+**    and A-ASSOCIATE-AC PDUs.
+**
 ** Algorithm:
 **      Description of the algorithm (optional) and any other notes.
 */
@@ -3291,6 +3304,13 @@ readPDU(PRIVATE_ASSOCIATIONKEY ** association, DUL_BLOCKOPTIONS block,
         if (cond.bad())
             return cond;
         (*association)->inputPDU = PDU_HEAD;
+    }
+
+    size_t limit = dcmAssociatePDUSizeLimit.get();
+    if ((limit > 0) && ((*association)->nextPDULength > limit))
+    {
+      DCMNET_ERROR("A-ASSOCIATE PDU too large: " << (*association)->nextPDULength << " bytes, refusing." );
+      return NET_EC_AssociatePDUTooLarge;
     }
 
     maxLength = ((*association)->nextPDULength)+100;
@@ -3859,7 +3879,7 @@ translatePresentationContextList(LST_HEAD ** internalList,
 
         userContext->acceptedTransferSyntax[0] = '\0';
         userContext->presentationContextID = context->contextID;
-        strcpy(userContext->abstractSyntax, context->abstractSyntax.data);
+        OFStandard::strlcpy(userContext->abstractSyntax, context->abstractSyntax.data, sizeof(userContext->abstractSyntax));
         userContext->proposedSCRole = DUL_SC_ROLE_DEFAULT;
         userContext->acceptedSCRole = DUL_SC_ROLE_DEFAULT;
 
@@ -3888,7 +3908,7 @@ translatePresentationContextList(LST_HEAD ** internalList,
         while (subItem != NULL) {
             transfer = (DUL_TRANSFERSYNTAX*)malloc(sizeof(DUL_TRANSFERSYNTAX));
             if (transfer == NULL) return EC_MemoryExhausted;
-            strcpy(transfer->transferSyntax, subItem->data);
+            OFStandard::strlcpy(transfer->transferSyntax, subItem->data, sizeof(transfer->transferSyntax));
 
             LST_Enqueue(&userContext->proposedTransferSyntax, (LST_NODE*)transfer);
             subItem = (DUL_SUBITEM*)LST_Next(&context->transferSyntaxList);

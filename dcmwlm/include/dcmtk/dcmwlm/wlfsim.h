@@ -1,6 +1,6 @@
 /*
  *
- *  Copyright (C) 1996-2017, OFFIS e.V.
+ *  Copyright (C) 1996-2018, OFFIS e.V.
  *  All rights reserved.  See COPYRIGHT file for details.
  *
  *  This software and supporting documentation were developed by
@@ -13,7 +13,7 @@
  *
  *  Module:  dcmwlm
  *
- *  Author:  Thomas Wilkens
+ *  Author:  Thomas Wilkens, Jan Schlamelcher
  *
  *  Purpose: Class for managing file system interaction.
  *
@@ -26,14 +26,15 @@
 #include "dcmtk/ofstd/ofstring.h"
 #include "dcmtk/ofstd/oftypes.h"   /* for OFBool */
 #include "dcmtk/ofstd/ofvector.h"
+#include "dcmtk/ofstd/ofmem.h"
 #include "dcmtk/dcmwlm/wldefine.h"
 
-template <class T> class OFOrderedSet;
 struct WlmSuperiorSequenceInfoType;
 class DcmDataset;
 class DcmTagKey;
 class OFCondition;
 class DcmItem;
+class OFdirectory_iterator;
 
 /** This class encapsulates data structures and operations for managing
  *  data base interaction in the framework of the DICOM basic worklist
@@ -63,24 +64,13 @@ class DCMTK_DCMWLM_EXPORT WlmFileSystemInteractionManager
     OFBool enableRejectionOfIncompleteWlFiles;
     /// called AE title
     OFString calledApplicationEntityTitle;
-    /// array of matching records
-    DcmDataset **matchingRecords;
-    /// number of array fields
-    unsigned long numOfMatchingRecords;
+    /// matching records
+    OFVector<OFshared_ptr<DcmDataset> > matchingRecords;
 
-      /** This function determines all worklist files in the directory specified by
-       *  dfPath and calledApplicationEntityTitle, and returns the complete path and
-       *  filename information in an array of strings.
-       *  @param worklistFiles Set of strings, each specifying path and filename to one worklist file.
+      /** Increment the given directory iterator until it refers to a worklist file (or past-the-end).
+       *  @param it A reference to an OFdirectory_iterator.
        */
-    void DetermineWorklistFiles( OFVector<OFString> &worklistFiles );
-
-      /** This function returns OFTrue if the given filename refers to a worklist file,
-       *  i.e. has an extension of ".wl".
-       *  @param fname The name of the file.
-       *  @return OFTrue in case the given filename refers to a worklist file, OFFalse otherwise.
-       */
-    OFBool IsWorklistFile( const char *fname );
+    OFdirectory_iterator& FindNextWorklistFile( OFdirectory_iterator& it );
 
       /** This function checks if the given dataset (which represents the information from a
        *  worklist file) contains all necessary return type 1 information. According to the
@@ -155,21 +145,23 @@ class DCMTK_DCMWLM_EXPORT WlmFileSystemInteractionManager
        */
     OFBool MatchSequences( DcmSequenceOfItems& candidate, DcmSequenceOfItems& query, const MatchingKeys& matchingKeys );
 
-      /** Determine if the sequences elements are universal matching.
+      /** Determine if a sequence is an universal match.
        *  @param query The query sequence.
        *  @param matchingKeys The matching keys to regard.
-       *  @param normalize normalize each element value. Defaults to OFTrue.
-       *  @param enableWildCardMatching enable or disable wild card matching. Defaults to OFTrue,
-       *    which means wild card matching is performed if the element's VR supports it. Set to
-       *    OFFalse to force single value matching instead.
-       *  @return returns OFTrue if sequence has no items or the element of the items are all empty or,
-       *    if enableWildCardMatching is enabled, containing only wildcard chars.
-       *    Returns OFFalse otherwise.
+       *  @param normalize Normalize each attribute value before the check. Defaults to OFTrue, which
+       *    means the value will be normalized as appropriate for the given VR, e.g. ignoring spaces
+       *    used as padding.
+       *  @param normalizeWildCards. Whether to interpret a query only consisting of wild cards as
+       *    an universal match. Defaults to OFTrue, which means wild cards will be normalized if an
+       *    attribute's VR supports it and it is allowed for the attribute (as defined by the matchingKeys
+       *    argument). Set to OFFalse to force strict interpretation instead.
+       *  @return OFTrue if the sequence has no items or if all attributes in its item can be considered
+       *    an universal match. Returns OFFalse otherwise.
        */
-    OFBool isUniversalMatchingSequences( DcmSequenceOfItems& query,
-                                         const MatchingKeys& matchingKeys,
-                                         const OFBool normalize = OFTrue,
-                                         const OFBool enableWildCardMatching = OFTrue );
+    OFBool IsUniversalMatch( DcmSequenceOfItems& query,
+                             const MatchingKeys& matchingKeys,
+                             const OFBool normalize = OFTrue,
+                             const OFBool normalizeWildCards = OFTrue );
 
       /** This function returns OFTrue, if the matching key attribute values in the
        *  dataset match the matching key attribute values in the search mask.
@@ -178,7 +170,7 @@ class DCMTK_DCMWLM_EXPORT WlmFileSystemInteractionManager
        *  @param matchingKeys The matching keys to regard.
        *  @return OFTrue in case the dataset matches the search mask in the matching key attribute values, OFFalse otherwise.
        */
-    OFBool DatasetMatchesSearchMask( DcmItem *dataset, DcmItem *searchMask, const MatchingKeys& matchingKeys );
+    OFBool DatasetMatchesSearchMask( DcmItem& dataset, DcmItem& searchMask, const MatchingKeys& matchingKeys );
 
   public:
       /** default constructor.
@@ -189,7 +181,7 @@ class DCMTK_DCMWLM_EXPORT WlmFileSystemInteractionManager
        */
     ~WlmFileSystemInteractionManager();
 
-      /**  Set value in member variable.
+      /** Set value in member variable.
        *  @param value The value to set.
        */
     void SetEnableRejectionOfIncompleteWlFiles( OFBool value );
@@ -214,14 +206,26 @@ class DCMTK_DCMWLM_EXPORT WlmFileSystemInteractionManager
        */
     OFBool IsCalledApplicationEntityTitleSupported( const OFString& calledApplicationEntityTitlev );
 
-      /** This function determines the records from the worklist files which match
+      /** This function determines the records from the Worklist files that match
        *  the given search mask and returns the number of matching records. Also,
-       *  this function will store the matching records in memory in the array
-       *  member variable matchingRecords.
-       *  @param searchMask - [in] The search mask.
-       *  @return Number of matching records.
+       *  this function will store the matching records inside the member variable
+       *  matchingRecords.
+       *  @param searchMask A pointer to the search mask.
+       *  @return The number of matching records.
        */
-    unsigned long DetermineMatchingRecords( DcmDataset *searchMask );
+    size_t DetermineMatchingRecords( DcmDataset* searchMask );
+
+      /** Determine whether a Worklist file matches the search mask.
+       *  @param searchMask A reference to the search mask.
+       *  @param  worklistFile An OFpath (hopefully) referring to a Worklist
+       *    file.
+       *  @details
+       *  This method will attempt to load the Worklist file referenced by the
+       *  argument worklistFile and, on success, compare it against searchMask.
+       *  If the file matches the search mask, its dataset part will be added
+       *  to the matching records member variable.
+       */
+    void MatchWorklistFile( DcmDataset& searchMask, const OFpath& worklistFile );
 
       /** For the matching record that is identified through idx, this function returns the number
        *  of items that are contained in the sequence element that is referred to by sequenceTag.

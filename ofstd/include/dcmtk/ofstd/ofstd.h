@@ -37,6 +37,7 @@
 #define INCLUDE_CSTDLIB
 #define INCLUDE_CSTDIO
 #define INCLUDE_CSTRING
+#define INCLUDE_CSTDARG
 #define INCLUDE_UNISTD
 #include "dcmtk/ofstd/ofstdinc.h"
 
@@ -142,6 +143,42 @@ class DCMTK_OFSTD_EXPORT OFStandard
       return my_strlcat(dst, src, siz);
 #endif
     }
+
+    /* Standard C99 formatted string output function.
+     * This is an implementation of the snprintf(3) function as defined in the
+     * C99 standard. Like all functions of the  printf() family, it produces
+     * output according to a format string. Output is written to the character
+     * array passed as parameter str. The function never writes more than size
+     * bytes and guarantees that the result will be NUL terminated, although
+     * it may be truncated if the buffer provided is too small.
+     * @param str string buffer to write to
+     * @param size size of string buffer, in bytes
+     * @param format printf() format string
+     * @param ... parameters to be formatted
+     * @return number of characters that have been written (if the buffer is
+     *   large enough) or the number of characters that would have been
+     *   written (if the buffer is too small), in both cases not including
+     *   the final NUL character.
+     */
+    static int snprintf(char *str, size_t size, const char *format, ...);
+
+    /* Standard C99 formatted string output function.
+     * This is an implementation of the snprintf(3) function as defined in the
+     * C99 standard. Like all functions of the  printf() family, it produces
+     * output according to a format string. Output is written to the character
+     * array passed as parameter str. The function never writes more than size
+     * bytes and guarantees that the result will be NUL terminated, although
+     * it may be truncated if the buffer provided is too small.
+     * @param str string buffer to write to
+     * @param size size of string buffer, in bytes
+     * @param format printf() format string
+     * @param ap parameters to be formatted
+     * @return number of characters that have been written (if the buffer is
+     *   large enough) or the number of characters that would have been
+     *   written (if the buffer is too small), in both cases not including
+     *   the final NUL character.
+     */
+    static int vsnprintf(char *str, size_t size, const char *format, va_list ap);
 
     /** convert a given error code to a string. This function wraps the various
      *  approaches found on different systems. Internally, the standard function
@@ -862,13 +899,13 @@ class DCMTK_OFSTD_EXPORT OFStandard
     static OFBool
     safeSubtract(T minuend, T subtrahend, T& difference)
     {
-      assert(!OFnumeric_limits<T>::is_signed);
-      if (minuend < subtrahend) {
-        return OFFalse;
-      } else {
-        difference = minuend - subtrahend;
-        return OFTrue;
-      }
+        assert(!OFnumeric_limits<T>::is_signed);
+        if (minuend < subtrahend) {
+            return OFFalse;
+        } else {
+            difference = minuend - subtrahend;
+            return OFTrue;
+        }
     }
 
     /** check whether addition is safe (i.e.\ no overflow occurs) and if so,
@@ -884,13 +921,34 @@ class DCMTK_OFSTD_EXPORT OFStandard
     static OFBool
     safeAdd(T a, T b, T& sum)
     {
-      assert(!OFnumeric_limits<T>::is_signed);
-      if ((OFnumeric_limits<T>::max)() - a < b) {
-        return OFFalse;
-      } else {
-        sum = a + b;
+        assert(!OFnumeric_limits<T>::is_signed);
+        if ((OFnumeric_limits<T>::max)() - a < b) {
+            return OFFalse;
+        } else {
+            sum = a + b;
+            return OFTrue;
+        }
+    }
+
+    /** check whether multiplication is safe (i.e.\ no overflow occurs) and if so,
+     *  perform it (i.e.\ compute a*b=product). Only works for unsigned types.
+     *  @param a first number to multiply
+     *  @param b second number to multiply
+     *  @param product resulting product of both numbers, if multiplication is
+     *    safe, otherwise parameter value is not touched by the function
+     *  @return OFTrue if multiplication is safe and could be performed, OFFalse
+     *    otherwise
+     */
+    template <typename T>
+    static OFBool safeMult(T a, T b, T& product)
+    {
+        assert(!OFnumeric_limits<T>::is_signed);
+        T x = a * b;
+        if (a != 0 && x / a != b) {
+            return OFFalse;
+        }
+        product = x;
         return OFTrue;
-      }
     }
 
 #ifdef DOXYGEN

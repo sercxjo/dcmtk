@@ -1,6 +1,6 @@
 /*
  *
- *  Copyright (C) 1994-2017, OFFIS e.V.
+ *  Copyright (C) 1994-2018, OFFIS e.V.
  *  All rights reserved.  See COPYRIGHT file for details.
  *
  *  This software and supporting documentation were partly developed by
@@ -97,6 +97,7 @@
 #include "dcmtk/dcmdata/dcelem.h"
 #include "dcmtk/dcmnet/diutil.h"
 #include "dcmtk/dcmnet/dimse.h"
+#include "dcmtk/ofstd/ofstd.h"
 #include "dimcmd.h"
 
 /*
@@ -207,7 +208,7 @@ getString(DcmDataset *obj, DcmTagKey t, char *s, int maxlen, OFBool *spacePadded
     if (ec == EC_Normal && elem != NULL) {
         if (elem->getLength() == 0) {
             s[0] = '\0';
-        } else if ((int)elem->getLength() > maxlen) {
+        } else if (elem->getLength() > (Uint32)maxlen) {
             return parseErrorWithMsg("dimcmd:getString: string too small", t);
         } else {
             ec =  elem->getString(aString);
@@ -655,12 +656,12 @@ buildCStoreRSP(T_DIMSE_C_StoreRSP * e, DcmDataset * obj)
     if (e->opts & O_STORE_AFFECTEDSOPINSTANCEUID)
     {
         char instanceuid[DIC_UI_LEN + 10];
-        strcpy(instanceuid, e->AffectedSOPInstanceUID);
+        OFStandard::strlcpy(instanceuid, e->AffectedSOPInstanceUID, DIC_UI_LEN + 10);
         if ((e->opts & O_STORE_PEER_REQUIRES_EXACT_UID_COPY) &&
             (e->opts & O_STORE_RSP_BLANK_PADDING))
         {
             // restore illegal space padding.
-            strcat(instanceuid, " ");
+            OFStandard::strlcat(instanceuid, " ", DIC_UI_LEN + 10);
         }
         cond = addString(obj, DCM_AffectedSOPInstanceUID, instanceuid, OFTrue); RET(cond);
     }

@@ -1,6 +1,6 @@
 /*
  *
- *  Copyright (C) 1996-2015, OFFIS e.V.
+ *  Copyright (C) 1996-2018, OFFIS e.V.
  *  All rights reserved.  See COPYRIGHT file for details.
  *
  *  This software and supporting documentation were developed by
@@ -103,7 +103,7 @@ class DCMTK_DCMIMGLE_EXPORT DiOverlayPlane
      */
     DiOverlayPlane(DiOverlayPlane *plane,
                    const unsigned int bit,
-                   Uint16 *data,
+                   const Uint16 *data,
                    Uint16 *temp,
                    const Uint16 width,
                    const Uint16 height,
@@ -516,7 +516,8 @@ inline int DiOverlayPlane::reset(const unsigned long frame)
                 OFstatic_cast(unsigned long, Columns) + (frameNumber - ImageFrameOrigin) * OFstatic_cast(unsigned long, Rows) *
                 OFstatic_cast(unsigned long, Columns)) * OFstatic_cast(unsigned long, BitsAllocated);
             StartBitPos = BitPos = OFstatic_cast(unsigned long, BitPosition) + bits;
-            DCMIMGLE_TRACE("  StartBitPos: " << StartBitPos << ", BitPosition: " << BitPosition << ", bits: " << bits);
+            DCMIMGLE_TRACE("  StartLeft: " << StartLeft << ", StartTop: " << StartTop << ", Columns: " << Columns << ", Rows: " << Rows);
+            DCMIMGLE_TRACE("  StartBitPos: " << StartBitPos << ", BitPosition: " << BitPosition << ", BitsAllocated: " << BitsAllocated << ", bits: " << bits);
             /* distinguish between embedded and separate overlay data */
             if (BitsAllocated == 16)
                 StartPtr = Ptr = Data + (bits >> 4);
