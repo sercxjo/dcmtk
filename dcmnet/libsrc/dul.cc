@@ -1958,7 +1958,7 @@ receiveTransportConnectionTCP(PRIVATE_NETWORKKEY ** network,
     if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *) &reuse, sizeof(reuse)) < 0)
 #endif
     {
-        OFString msg = "TCP Initialization Error: ";
+        OFString msg = "TCP Initialization Error: (8) ";
         msg += OFStandard::getLastNetworkErrorCode().message();
         return makeDcmnetCondition(DULC_TCPINITERROR, OF_error, msg.c_str());
     }
@@ -1998,7 +1998,7 @@ receiveTransportConnectionTCP(PRIVATE_NETWORKKEY ** network,
 #endif
       if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char*)&tcpNoDelay, sizeof(tcpNoDelay)) < 0)
       {
-        OFString msg = "TCP Initialization Error: ";
+        OFString msg = "TCP Initialization Error: (9) ";
         msg += OFStandard::getLastNetworkErrorCode().message();
         return makeDcmnetCondition(DULC_TCPINITERROR, OF_error, msg.c_str());
       }
@@ -2090,7 +2090,7 @@ receiveTransportConnectionTCP(PRIVATE_NETWORKKEY ** network,
 #else
       (void) close(sock);
 #endif
-      OFString msg = "TCP Initialization Error: ";
+      OFString msg = "TCP Initialization Error: (10) ";
       msg += OFStandard::getLastNetworkErrorCode().message();
       return makeDcmnetCondition(DULC_TCPINITERROR, OF_error, msg.c_str());
     }
@@ -2242,7 +2242,7 @@ initializeNetworkTCP(PRIVATE_NETWORKKEY ** key, void *parameter)
       if (sock < 0)
 #endif
       {
-        OFString msg = "TCP Initialization Error: ";
+        OFString msg = "TCP Initialization Error: (11) ";
         msg += OFStandard::getLastNetworkErrorCode().message();
         return makeDcmnetCondition(DULC_TCPINITERROR, OF_error, msg.c_str());
       }
@@ -2254,7 +2254,7 @@ initializeNetworkTCP(PRIVATE_NETWORKKEY ** key, void *parameter)
       if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *) &reuse, sizeof(reuse)) < 0)
 #endif
       {
-        OFString msg = "TCP Initialization Error: ";
+        OFString msg = "TCP Initialization Error: (12) ";
         msg += OFStandard::getLastNetworkErrorCode().message();
           return makeDcmnetCondition(DULC_TCPINITERROR, OF_error, msg.c_str());
       }
@@ -2265,7 +2265,7 @@ initializeNetworkTCP(PRIVATE_NETWORKKEY ** key, void *parameter)
       server.sin_port = (unsigned short) htons((*key)->networkSpecific.TCP.port);
       if (bind(sock, (struct sockaddr *) & server, sizeof(server)))
       {
-        OFString msg = "TCP Initialization Error: ";
+        OFString msg = "TCP Initialization Error: (13) ";
         msg += OFStandard::getLastNetworkErrorCode().message();
         return makeDcmnetCondition(DULC_TCPINITERROR, OF_error, msg.c_str());
       }
@@ -2273,14 +2273,14 @@ initializeNetworkTCP(PRIVATE_NETWORKKEY ** key, void *parameter)
       length = sizeof(server);
       if (getsockname(sock, (struct sockaddr *) &server, &length))
       {
-        OFString msg = "TCP Initialization Error: ";
+        OFString msg = "TCP Initialization Error: (14) ";
         msg += OFStandard::getLastNetworkErrorCode().message();
         return makeDcmnetCondition(DULC_TCPINITERROR, OF_error, msg.c_str());
       }
       sockarg.l_onoff = 0;
       if (setsockopt(sock, SOL_SOCKET, SO_LINGER, (char *) &sockarg, sizeof(sockarg)) < 0)
       {
-        OFString msg = "TCP Initialization Error: ";
+        OFString msg = "TCP Initialization Error: (15) ";
         msg += OFStandard::getLastNetworkErrorCode().message();
         return makeDcmnetCondition(DULC_TCPINITERROR, OF_error, msg.c_str());
       }
@@ -2288,7 +2288,7 @@ initializeNetworkTCP(PRIVATE_NETWORKKEY ** key, void *parameter)
       /* Listen on the socket */
       if (listen(sock, PRV_LISTENBACKLOG) < 0)
       {
-        OFString msg = "TCP Initialization Error: ";
+        OFString msg = "TCP Initialization Error: (16) ";
         msg += OFStandard::getLastNetworkErrorCode().message();
         return makeDcmnetCondition(DULC_TCPINITERROR, OF_error, msg.c_str());
       }

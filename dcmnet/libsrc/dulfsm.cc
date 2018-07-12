@@ -2266,7 +2266,7 @@ requestAssociationTCP(PRIVATE_NETWORKKEY ** network,
     if (s < 0)
 #endif
     {
-      OFString msg = "TCP Initialization Error: ";
+      OFString msg = "TCP Initialization Error : (1) ";
       msg += OFStandard::getLastNetworkErrorCode().message();
       return makeDcmnetCondition(DULC_TCPINITERROR, OF_error, msg.c_str());
     }
@@ -2356,7 +2356,7 @@ requestAssociationTCP(PRIVATE_NETWORKKEY ** network,
             if ((*association)->connection) delete (*association)->connection;
             (*association)->connection = NULL;
 
-            OFString msg = "TCP Initialization Error: ";
+            OFString msg = "TCP Initialization Error: (2) ";
             msg += OFStandard::getLastNetworkErrorCode().message();
             msg += " (Timeout)";
             return makeDcmnetCondition(DULC_TCPINITERROR, OF_error, msg.c_str());
@@ -2392,7 +2392,7 @@ requestAssociationTCP(PRIVATE_NETWORKKEY ** network,
                 (*association)->connection = NULL;
 
                 char buf[256];
-                OFString msg = "TCP Initialization Error: ";
+                OFString msg = "TCP Initialization Error: (3) ";
                 msg += OFStandard::strerror(socketError, buf, sizeof(buf));
                 return makeDcmnetCondition(DULC_TCPINITERROR, OF_error, msg.c_str());
             }
@@ -2428,7 +2428,7 @@ requestAssociationTCP(PRIVATE_NETWORKKEY ** network,
         if ((*association)->connection) delete (*association)->connection;
         (*association)->connection = NULL;
 
-        OFString msg = "TCP Initialization Error: ";
+        OFString msg = "TCP Initialization Error: (4) ";
         msg += OFStandard::getLastNetworkErrorCode().message();
         return makeDcmnetCondition(DULC_TCPINITERROR, OF_error, msg.c_str());
     } else {
@@ -2453,7 +2453,7 @@ requestAssociationTCP(PRIVATE_NETWORKKEY ** network,
 #endif
           (*association)->networkState = NETWORK_DISCONNECTED;
 
-          OFString msg = "TCP Initialization Error: ";
+          OFString msg = "TCP Initialization Error: (5) ";
           msg += OFStandard::getLastNetworkErrorCode().message();
           return makeDcmnetCondition(DULC_TCPINITERROR, OF_error, msg.c_str());
         }
@@ -2462,7 +2462,7 @@ requestAssociationTCP(PRIVATE_NETWORKKEY ** network,
 
         if (setsockopt(s, SOL_SOCKET, SO_LINGER, (char *) &sockarg, (int) sizeof(sockarg)) < 0)
         {
-          OFString msg = "TCP Initialization Error: ";
+          OFString msg = "TCP Initialization Error: (6) ";
           msg += OFStandard::getLastNetworkErrorCode().message();
           return makeDcmnetCondition(DULC_TCPINITERROR, OF_error, msg.c_str());
         }
@@ -2502,7 +2502,7 @@ requestAssociationTCP(PRIVATE_NETWORKKEY ** network,
 #endif
           if (setsockopt(s, IPPROTO_TCP, TCP_NODELAY, (char*)&tcpNoDelay, sizeof(tcpNoDelay)) < 0)
           {
-            OFString msg = "TCP Initialization Error: ";
+            OFString msg = "TCP Initialization Error: (7) ";
             msg += OFStandard::getLastNetworkErrorCode().message();
             return makeDcmnetCondition(DULC_TCPINITERROR, OF_error, msg.c_str());
           }
