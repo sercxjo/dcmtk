@@ -112,10 +112,11 @@ DUL_dataWaiting(DUL_ASSOCIATIONKEY * callerAssociation, int timeout)
 {
     PRIVATE_ASSOCIATIONKEY * association = (PRIVATE_ASSOCIATIONKEY *)callerAssociation;
     if ((association==NULL)||(association->connection == NULL)) return OFFalse;
-    if (association->timeoutCallback) timeout = 1;
-    for (unsigned long t=0; ; t++) {
+    if (association->timeoutCallback && timeout > 1) timeout = 1;
+    for (unsigned long t= timeout; ; t++) {
         if (association->connection->networkDataAvailable(timeout)) return OFTrue;
         if (!association->timeoutCallback || !association->timeoutCallback->timeout(t)) return OFFalse;
+        timeout = 1;
     }
 }
 
