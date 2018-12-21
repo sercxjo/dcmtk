@@ -311,7 +311,7 @@ findSCUSCPRole(LST_HEAD ** lst, char *abstractSyntax);
 void destroyPresentationContextList(LST_HEAD ** l);
 void destroyUserInformationLists(DUL_USERINFO * userInfo);
 
-static FSM_Event_Description Event_Table[] = {
+const static FSM_Event_Description Event_Table[] = {
     {A_ASSOCIATE_REQ_LOCAL_USER, "A-ASSOCIATE request (local user)"},
     {TRANS_CONN_CONFIRM_LOCAL_USER, "Transport conn confirmation (local)"},
     {A_ASSOCIATE_AC_PDU_RCV, "A-ASSOCIATE-AC PDU (on transport)"},
@@ -333,7 +333,7 @@ static FSM_Event_Description Event_Table[] = {
     {INVALID_PDU, "Unrecognized/invalid PDU"}
 };
 
-static FSM_FUNCTION FSM_FunctionTable[] = {
+const static FSM_FUNCTION FSM_FunctionTable[] = {
     {AE_1, AE_1_TransportConnect, "AE 1 Transport Connect"},
     {AE_2, AE_2_SendAssociateRQPDU, "AE 2 Send Associate RQ PDU"},
     {AE_3, AE_3_AssociateConfirmationAccept, "AE 3 Associate Confirmation Accept"},
@@ -2310,34 +2310,31 @@ requestAssociationTCP(PRIVATE_NETWORKKEY ** network,
     if (rc < 0 && errno == EINPROGRESS)
 #endif
     {
-#ifndef DCMTK_HAVE_POLL
-        // we're in non-blocking mode. Prepare to wait for timeout.
-        fd_set fdSet;
-        FD_ZERO(&fdSet);
-#ifdef __MINGW32__
-        // on MinGW, FD_SET expects an unsigned first argument
-        FD_SET((unsigned int) s, &fdSet);
-#else
-        FD_SET(s, &fdSet);
-#endif /* __MINGW32__ */
-#endif /* DCMTK_HAVE_POLL */
-
         struct timeval timeout;
         timeout.tv_sec = connectTimeout;
         timeout.tv_usec = 0;
 
-        unsigned long attempt = 0;
+        unsigned long attempt = connectTimeout;
         do {
-#ifdef DCMTK_HAVE_POLL
+#ifndef DCMTK_HAVE_POLL
+            // we're in non-blocking mode. Prepare to wait for timeout.
+            fd_set fdSet;
+            FD_ZERO(&fdSet);
+#ifdef __MINGW32__
+            // on MinGW, FD_SET expects an unsigned first argument
+            FD_SET((unsigned int) s, &fdSet);
+#else
+            FD_SET(s, &fdSet);
+#endif /* __MINGW32__ */
+            // the typecast is safe because Windows ignores the first select() parameter anyway
+            rc = select(OFstatic_cast(int, s + 1), NULL, &fdSet, NULL, &timeout);
+#else
             struct pollfd pfd[] =
             {
                 { s, POLLOUT, 0 }
             };
             rc = poll(pfd, 1, timeout.tv_sec*1000+(timeout.tv_usec/1000));
-#else
-            // the typecast is safe because Windows ignores the first select() parameter anyway
-            rc = select(OFstatic_cast(int, s + 1), NULL, &fdSet, NULL, &timeout);
-#endif
+#endif /* DCMTK_HAVE_POLL */
         } while (rc == -1 && OFStandard::getLastNetworkErrorCode().value() == DCMNET_EINTR
               || rc == 0 && params->timeoutCallback && params->timeoutCallback->timeout(attempt++));
 
