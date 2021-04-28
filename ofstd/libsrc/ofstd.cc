@@ -111,6 +111,8 @@ END_EXTERN_C
 #include "dcmtk/ofstd/ofvector.h"
 #include "dcmtk/ofstd/ofdiag.h"
 
+#include <set>
+#include <utility>
 #include <cmath>
 #include <cstring>       /* for memset() */
 
@@ -1114,9 +1116,15 @@ size_t OFStandard::searchDirectoryRecursively(const OFFilename &directory,
                                               const OFFilename &dirPrefix,
                                               const OFBool recurse)
 {
-    const size_t initialSize = fileList.size();
+  const size_t initialSize = fileList.size();
+  OFList<OFFilename> dirs{directory};
+  std::set< std::pair<dev_t,ino_t> > passed;
+
+  for (auto dir= dirs.begin(); dir != dirs.end(); dirs.pop_front(), dir= dirs.begin()) {
+
     OFFilename dirName, pathName, tmpString;
-    combineDirAndFilename(dirName, dirPrefix, directory);
+    combineDirAndFilename(dirName, dirPrefix, *dir);
+
 #ifdef HAVE_WINDOWS_H
     /* check whether given directory exists */
     if (dirExists(dirName))
@@ -1139,7 +1147,7 @@ size_t OFStandard::searchDirectoryRecursively(const OFFilename &directory,
                         if (wcscmp(dirName.getWideCharPointer(), L".") == 0)
                             pathName.set(data.cFileName, OFTrue /*convert*/);
                         else
-                            combineDirAndFilename(pathName, directory, data.cFileName, OFTrue /*allowEmptyDirName*/);
+                            combineDirAndFilename(pathName, *dir, data.cFileName, OFTrue /*allowEmptyDirName*/);
                         /* ignore directories and the like */
                         if (fileExists(combineDirAndFilename(tmpString, dirPrefix, pathName, OFTrue /*allowEmptyDirName*/)))
                             fileList.push_back(pathName);
@@ -1159,12 +1167,15 @@ size_t OFStandard::searchDirectoryRecursively(const OFFilename &directory,
                         if (wcscmp(dirName.getWideCharPointer(), L".") == 0)
                             pathName.set(data.cFileName, OFTrue /*convert*/);
                         else
-                            combineDirAndFilename(pathName, directory, data.cFileName, OFTrue /*allowEmptyDirName*/);
-                        if (dirExists(combineDirAndFilename(tmpString, dirPrefix, pathName, OFTrue /*allowEmptyDirName*/)))
+                            combineDirAndFilename(pathName, *dir, data.cFileName, OFTrue /*allowEmptyDirName*/);
+                        if (
+                          data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY
+                          || dirExists(combineDirAndFilename(tmpString, dirPrefix, pathName, OFTrue /*allowEmptyDirName*/))
+                        )
                         {
-                            /* recursively search sub directories */
+                            /* search sub directories on the next iterations */
                             if (recurse)
-                                searchDirectoryRecursively(pathName, fileList, pattern, dirPrefix, recurse);
+                                dirs.push_back(pathName);
                         }
                         else if (pattern.isEmpty())
                         {
@@ -1193,7 +1204,7 @@ size_t OFStandard::searchDirectoryRecursively(const OFFilename &directory,
                         if (strcmp(dirName.getCharPointer(), ".") == 0)
                             pathName.set(data.cFileName);
                         else
-                            combineDirAndFilename(pathName, directory, data.cFileName, OFTrue /*allowEmptyDirName*/);
+                            combineDirAndFilename(pathName, *dir, data.cFileName, OFTrue /*allowEmptyDirName*/);
                         /* ignore directories and the like */
                         if (fileExists(combineDirAndFilename(tmpString, dirPrefix, pathName, OFTrue /*allowEmptyDirName*/)))
                             fileList.push_back(pathName);
@@ -1213,12 +1224,15 @@ size_t OFStandard::searchDirectoryRecursively(const OFFilename &directory,
                         if (strcmp(dirName.getCharPointer(), ".") == 0)
                             pathName.set(data.cFileName);
                         else
-                            combineDirAndFilename(pathName, directory, data.cFileName, OFTrue /*allowEmptyDirName*/);
-                        if (dirExists(combineDirAndFilename(tmpString, dirPrefix, pathName, OFTrue /*allowEmptyDirName*/)))
+                            combineDirAndFilename(pathName, *dir, data.cFileName, OFTrue /*allowEmptyDirName*/);
+                        if (
+                          data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY
+                          || dirExists(combineDirAndFilename(tmpString, dirPrefix, pathName, OFTrue /*allowEmptyDirName*/))
+                        )
                         {
-                            /* recursively search sub directories */
+                            /* search sub directories on the next iterations */
                             if (recurse)
-                                searchDirectoryRecursively(pathName, fileList, pattern, dirPrefix, recurse);
+                                dirs.push_back(pathName);
                         }
                         else if (pattern.isEmpty())
                         {
@@ -1234,8 +1248,21 @@ size_t OFStandard::searchDirectoryRecursively(const OFFilename &directory,
 #else /* HAVE_WINDOWS_H */
     /* try to open the directory */
     DIR *dirPtr = opendir(dirName.getCharPointer());
-    if (dirPtr != NULL)
+    struct stat statbuf;
+    if (!dirPtr)
     {
+        if (errno == ENOTDIR)
+#ifdef HAVE_FNMATCH_H
+            /* check whether filename matches pattern */
+            if ((pattern.isEmpty()) || (fnmatch(pattern.getCharPointer(), dir->getCharPointer(), FNM_PATHNAME) == 0))
+#else
+            /* no pattern matching, sorry :-/ */
+#endif
+                fileList.push_back(*dir);
+    }
+    else if (fstat(dirfd(dirPtr), &statbuf)==0 && (statbuf.st_mode|S_IFDIR) && !passed.count(std::make_pair(statbuf.st_dev, statbuf.st_ino)))
+    {
+        passed.emplace(statbuf.st_dev, statbuf.st_ino);
         struct dirent *entry = NULL;
 #if defined(HAVE_READDIR_R) && !defined(READDIR_IS_THREADSAFE)
         dirent d = {};
@@ -1251,12 +1278,15 @@ size_t OFStandard::searchDirectoryRecursively(const OFFilename &directory,
                 if (strcmp(dirName.getCharPointer(), ".") == 0)
                     pathName = entry->d_name;
                 else
-                    combineDirAndFilename(pathName, directory, entry->d_name, OFTrue /*allowEmptyDirName*/);
-                if (dirExists(combineDirAndFilename(tmpString, dirPrefix, pathName, OFTrue /*allowEmptyDirName*/)))
+                    combineDirAndFilename(pathName, *dir, entry->d_name, OFTrue /*allowEmptyDirName*/);
+                if (
+                  entry->d_type == DT_DIR || (entry->d_type == DT_LNK || entry->d_type == DT_UNKNOWN) &&
+                  dirExists(combineDirAndFilename(tmpString, dirPrefix, pathName, OFTrue /*allowEmptyDirName*/))
+                )
                 {
                     /* recursively search sub directories */
                     if (recurse)
-                        searchDirectoryRecursively(pathName, fileList, pattern, dirPrefix, recurse);
+                          dirs.push_back(pathName);
                 } else {
 #ifdef HAVE_FNMATCH_H
                     /* check whether filename matches pattern */
@@ -1264,15 +1294,17 @@ size_t OFStandard::searchDirectoryRecursively(const OFFilename &directory,
 #else
                         /* no pattern matching, sorry :-/ */
 #endif
+
                         fileList.push_back(pathName);
                 }
             }
         }
         closedir(dirPtr);
-    }
+    } else if (dirPtr) closedir(dirPtr);
 #endif /* HAVE_WINDOWS_H */
-    /* return number of added files */
-    return fileList.size() - initialSize;
+  }
+  /* return number of added files */
+  return fileList.size() - initialSize;
 }
 
 
