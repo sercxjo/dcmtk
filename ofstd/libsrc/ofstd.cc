@@ -3261,6 +3261,17 @@ OFerror_code OFStandard::getLastNetworkErrorCode()
 #endif
 }
 
+#ifdef _WIN32
+OFStandard::ErrorModeGuard::ErrorModeGuard(unsigned int newMode): m_OldMode(SetErrorMode(newMode))
+{
+    if ((m_OldMode | newMode) != newMode) SetErrorMode(m_OldMode | newMode);
+}
+OFStandard::ErrorModeGuard::~ErrorModeGuard()
+{
+   SetErrorMode(m_OldMode);
+}
+#endif
+
 #include DCMTK_DIAGNOSTIC_IGNORE_STRICT_ALIASING_WARNING
 
 // black magic:
