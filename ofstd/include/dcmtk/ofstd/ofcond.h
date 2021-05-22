@@ -143,6 +143,8 @@ extern DCMTK_OFSTD_EXPORT const unsigned short EC_CODE_CannotControlConverter;
 
 /// status code constant: error, cannot create directory
 extern DCMTK_OFSTD_EXPORT const unsigned short EC_CODE_CannotCreateDirectory;
+/// base status code constant: error, cannot read directory
+extern DCMTK_OFSTD_EXPORT const unsigned short EC_CODE_CannotReadDirectory;
 //@}
 
 

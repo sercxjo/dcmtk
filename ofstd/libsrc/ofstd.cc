@@ -1093,11 +1093,12 @@ size_t OFStandard::searchDirectoryRecursively(const OFString &directory,
                                               OFList<OFString> &fileList,
                                               const OFString &pattern,
                                               const OFString &dirPrefix,
-                                              const OFBool recurse)
+                                              const OFBool recurse,
+                                              OFList<OFCondition>* errors)
 {
     OFList<OFFilename> filenameList;
     /* call the real function */
-    const size_t result = searchDirectoryRecursively(directory, filenameList, pattern, dirPrefix, recurse);
+    const size_t result = searchDirectoryRecursively(directory, filenameList, pattern, dirPrefix, recurse, errors);
     /* copy all list entries to reference parameter */
     OFListIterator(OFFilename) iter = filenameList.begin();
     OFListIterator(OFFilename) last = filenameList.end();
@@ -1114,7 +1115,8 @@ size_t OFStandard::searchDirectoryRecursively(const OFFilename &directory,
                                               OFList<OFFilename> &fileList,
                                               const OFFilename &pattern,
                                               const OFFilename &dirPrefix,
-                                              const OFBool recurse)
+                                              const OFBool recurse,
+                                              OFList<OFCondition>* errors)
 {
   const size_t initialSize = fileList.size();
   OFList<OFFilename> dirs{directory};
@@ -1155,6 +1157,13 @@ size_t OFStandard::searchDirectoryRecursively(const OFFilename &directory,
                             fileList.push_back(pathName);
                     } while (FindNextFileW(handle, &data));
                     FindClose(handle);
+                } else {
+                    OFerror_code ec = OFStandard::getLastSystemErrorCode();
+                    OFString message("Opening directory ");
+                    message += dirName.getCharPointer();
+                    message += ": ";
+                    message += ec.message();
+                    errors->emplace_back(makeOFCondition(0, EC_CODE_CannotReadDirectory | ec.value(), OF_error, message.c_str()));
                 }
             }
             /* then search for _any_ file/directory entry */
@@ -1212,6 +1221,13 @@ size_t OFStandard::searchDirectoryRecursively(const OFFilename &directory,
                             fileList.push_back(pathName);
                     } while (FindNextFileA(handle, &data));
                     FindClose(handle);
+                } else {
+                    OFerror_code ec = OFStandard::getLastSystemErrorCode();
+                    OFString message("Opening directory ");
+                    message += dirName.getCharPointer();
+                    message += ": ";
+                    message += ec.message();
+                    errors->emplace_back(makeOFCondition(0, EC_CODE_CannotReadDirectory | ec.value(), OF_error, message.c_str()));
                 }
             }
             /* then search for _any_ file/directory entry */
@@ -1254,6 +1270,7 @@ size_t OFStandard::searchDirectoryRecursively(const OFFilename &directory,
     if (!dirPtr)
     {
         if (errno == ENOTDIR)
+        {
 #ifdef HAVE_FNMATCH_H
             /* check whether filename matches pattern */
             if ((pattern.isEmpty()) || (fnmatch(pattern.getCharPointer(), dir->getCharPointer(), FNM_PATHNAME) == 0))
@@ -1261,6 +1278,14 @@ size_t OFStandard::searchDirectoryRecursively(const OFFilename &directory,
             /* no pattern matching, sorry :-/ */
 #endif
                 fileList.push_back(*dir);
+        } else if (errors) {
+            OFerror_code ec = OFStandard::getLastSystemErrorCode();
+            OFString message("Opening directory ");
+            message += dirName.getCharPointer();
+            message += ": ";
+            message += ec.message();
+            errors->emplace_back(makeOFCondition(0, EC_CODE_CannotReadDirectory | ec.value(), OF_error, message.c_str()));
+        }
     }
     else if (fstat(dirfd(dirPtr), &statbuf)==0 && (statbuf.st_mode|S_IFDIR) && !passed.count(std::make_pair(statbuf.st_dev, statbuf.st_ino)))
     {
@@ -1268,9 +1293,9 @@ size_t OFStandard::searchDirectoryRecursively(const OFFilename &directory,
         struct dirent *entry = NULL;
 #if defined(HAVE_READDIR_R) && !defined(READDIR_IS_THREADSAFE)
         dirent d = {};
-        while (!readdir_r(dirPtr, &d, &entry) && entry)
+        while (!(errno= readdir_r(dirPtr, &d, &entry)) && entry)
 #else
-        while ((entry = readdir(dirPtr)) != NULL)
+        while ((errno= 0, entry = readdir(dirPtr)) != NULL)
 #endif
         {
             /* filter out current (".") and parent directory ("..") */
@@ -1300,6 +1325,14 @@ size_t OFStandard::searchDirectoryRecursively(const OFFilename &directory,
                         fileList.push_back(pathName);
                 }
             }
+        }
+        if (errno && errors) {
+            OFerror_code ec = OFStandard::getLastSystemErrorCode();
+            OFString message("Reading directory ");
+            message += dirName.getCharPointer();
+            message += ": ";
+            message += ec.message();
+            errors->emplace_back(makeOFCondition(0, EC_CODE_CannotReadDirectory | ec.value(), OF_error, message.c_str()));
         }
         closedir(dirPtr);
     } else if (dirPtr) closedir(dirPtr);

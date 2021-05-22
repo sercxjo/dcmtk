@@ -502,7 +502,8 @@ class DCMTK_OFSTD_EXPORT OFStandard
                                              OFList<OFString> &fileList,
                                              const OFString &pattern = "",
                                              const OFString &dirPrefix = "",
-                                             const OFBool recurse = OFTrue);
+                                             const OFBool recurse = OFTrue,
+                                             OFList<OFCondition>* errors = NULL);
 
     /** scan a given directory (recursively) and add all filenames found to a list
      *  @param directory name of the directory to be scanned. This name may contain
@@ -528,7 +529,8 @@ class DCMTK_OFSTD_EXPORT OFStandard
                                              OFList<OFFilename> &fileList,
                                              const OFFilename &pattern,
                                              const OFFilename &dirPrefix,
-                                             const OFBool recurse = OFTrue);
+                                             const OFBool recurse = OFTrue,
+                                             OFList<OFCondition>* errors = NULL);
 
     /** create a directory (including sub-directories) if it does not yet exist.  In other
      *  words, this function creates directories recursively, i.e. with all sub-components.

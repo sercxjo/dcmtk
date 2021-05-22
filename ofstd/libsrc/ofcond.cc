@@ -40,6 +40,7 @@ makeOFConditionConst(EC_CouldNotGenerateFilename,      0, 14, OF_error,   "Could
 makeOFConditionConst(EC_CouldNotGenerateDirectoryName, 0, 15, OF_error,   "Could not generate directory name");
 makeOFConditionConst(EC_setuidFailed,                  0, 16, OF_error,   "Call to setuid() failed");
 makeOFConditionConst(EC_NotYetImplemented,             0, 17, OF_error,   "Not yet implemented");
+// codes post 0x8000 is for dynamically created error messages (see constant below)
 
 // NOTE:
 // error codes 1024..2047 are reserved for inter-process communication
@@ -50,3 +51,4 @@ const unsigned short EC_CODE_CannotCloseEncoding    = 6;
 const unsigned short EC_CODE_CannotConvertEncoding  = 7;
 const unsigned short EC_CODE_CannotControlConverter = 8;
 const unsigned short EC_CODE_CannotCreateDirectory  = 13;
+const unsigned short EC_CODE_CannotReadDirectory    = 0x8000; ///< Base nubmer combined with the system errno or GetLastError
