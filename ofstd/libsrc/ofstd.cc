@@ -1120,6 +1120,8 @@ size_t OFStandard::searchDirectoryRecursively(const OFFilename &directory,
   OFList<OFFilename> dirs{directory};
   std::set< std::pair<dev_t,ino_t> > passed;
 
+  ErrorModeGuard emGuard;
+
   for (auto dir= dirs.begin(); dir != dirs.end(); dirs.pop_front(), dir= dirs.begin()) {
 
     OFFilename dirName, pathName, tmpString;
