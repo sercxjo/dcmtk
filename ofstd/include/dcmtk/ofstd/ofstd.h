@@ -1159,7 +1159,7 @@ class DCMTK_OFSTD_EXPORT OFStandard
     /** Compatible RAII guard for windows error mode to hide system dialogs on io errors.
      *  Empty implementation for other systems.
      */
-    struct ErrorModeGuard {
+    struct DCMTK_OFSTD_EXPORT ErrorModeGuard {
 #ifdef _WIN32
       unsigned int m_OldMode;
       ErrorModeGuard(unsigned int newMode=1);
