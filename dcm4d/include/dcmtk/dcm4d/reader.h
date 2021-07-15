@@ -72,6 +72,8 @@ struct DCMTK_DCM4D_EXPORT SliceInfo {
     bool HasImagePositionPatient=false; ///< ImagePositionPatient exists in the DICOM file as 3 coordinates
     bool HasOrientation=false;
 
+    void* Data=nullptr; ///< User data, may be image or structured report data from the file
+
     bool operator<(const SliceInfo& b) const; /// For ordering slices in the image
 
     bool fill(DcmItem* d1, DcmItem* d2=nullptr);
@@ -110,7 +112,9 @@ struct DCMTK_DCM4D_EXPORT SeriesInfo
     std::string Modality;
     std::string SOPClassUID;
 
-    bool fill(DcmItem* d1, DcmItem* d2=nullptr);
+    int BlockID=0; ///< May be used to split some inhomogeneous series onto parts
+
+    bool fill(DcmItem* d1, DcmItem* d2=nullptr, DcmItem* patientData=nullptr);
     bool operator<(const SeriesInfo& b) const; ///< For ordering series
 
     std::set<SliceInfo> slices;

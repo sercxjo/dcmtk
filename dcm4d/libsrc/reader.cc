@@ -23,8 +23,8 @@
 bool SliceInfo::fill(DcmItem* d1, DcmItem* d2)
 {
   SOPInstanceUID= stringTag(DCM_SOPInstanceUID, d1, d2, false);
-  if (SOPInstanceUID.empty())  SOPInstanceUID= stringTag(DCM_ReferencedSOPInstanceUIDInFile, d1, d2, false);
-  if (SOPInstanceUID.empty())  SOPInstanceUID= stringTag(DCM_MediaStorageSOPInstanceUID, d1, d2, false);
+  if (SOPInstanceUID.empty())  SOPInstanceUID= stringTag(DCM_ReferencedSOPInstanceUIDInFile, d2, d1, false);
+  if (SOPInstanceUID.empty())  SOPInstanceUID= stringTag(DCM_MediaStorageSOPInstanceUID, d2, d1, false);
   if (SOPInstanceUID.empty())  return false;
   Laterality = stringTag(DCM_ImageLaterality, d1, d2, false);
   if (Laterality.empty())  Laterality = stringTag(DCM_Laterality, d1, d2, false);
@@ -103,22 +103,23 @@ bool SliceInfo::getTag(Vector3D (&r)[3], DcmTagKey tag, DcmItem* d1, DcmItem* d2
   return true;
 }
 
-bool SeriesInfo::fill(DcmItem* d1, DcmItem* d2)
+bool SeriesInfo::fill(DcmItem* d1, DcmItem* d2, DcmItem* patientData)
 {
   SeriesInstanceUID= SliceInfo::stringTag(DCM_SeriesInstanceUID, d1, d2, false);
   StudyInstanceUID= SliceInfo::stringTag(DCM_StudyInstanceUID, d1, d2, false);
   SliceInfo::getTag(SeriesNumber, DCM_SeriesNumber, d1, d2, false);
   if (SeriesInstanceUID.empty() && StudyInstanceUID.empty())  return false;
-  PatientID= SliceInfo::stringTag(DCM_PatientID, d2, d1, false);
-  IssuerOfPatientID= SliceInfo::stringTag(DCM_IssuerOfPatientID, d2, d1, false);
-  PatientName= SliceInfo::stringTag(DCM_PatientName, d1, d2, false);
-  PatientBirthDate= SliceInfo::stringTag(DCM_PatientBirthDate, d1, d2, false);
+  PatientID= SliceInfo::stringTag(DCM_PatientID, !!patientData? patientData: d2, d1, false);
+  IssuerOfPatientID= SliceInfo::stringTag(DCM_IssuerOfPatientID, !!patientData? patientData: d2, d1, false);
+  PatientName= SliceInfo::stringTag(DCM_PatientName, d1, !!patientData? patientData: d2, false);
+  PatientBirthDate= SliceInfo::stringTag(DCM_PatientBirthDate, d1, !!patientData? patientData: d2, false);
   StudyDate= SliceInfo::stringTag(DCM_StudyDate, d1, d2, false);
   StudyID= SliceInfo::stringTag(DCM_StudyID, d1, d2, false);
   SeriesTime= SliceInfo::stringTag(DCM_SeriesTime, d1, d2, false);
   Modality= SliceInfo::stringTag(DCM_Modality, d1, d2, false);
   SOPClassUID= SliceInfo::stringTag(DCM_SOPClassUID, d1, d2, false);
-  return true;
+  if (SOPClassUID.empty()) SOPClassUID= SliceInfo::stringTag(DCM_MediaStorageSOPClassUID, d2, d1, false);
+  return !SOPClassUID.empty();
 }
 
 bool SliceInfo::operator<(const SliceInfo& b) const
@@ -180,12 +181,12 @@ bool SliceInfo::operator<(const SliceInfo& b) const
        ? -1
        : b.FileName.getWideCharPointer()==0 ? 1 : wcscmp(FileName.getWideCharPointer(), b.FileName.getWideCharPointer()))  return x < 0;
 #endif
-  return strcmp(FileName.getCharPointer(), b.FileName.getCharPointer()) < 0;
+  return FileName.getCharPointer()!=b.FileName.getCharPointer() && !!b.FileName.getCharPointer() && (!FileName.getCharPointer() || strcmp(FileName.getCharPointer(), b.FileName.getCharPointer()) < 0);
 }
 
 bool SeriesInfo::operator<(const SeriesInfo& b) const
 {
-  if (PatientID != b.PatientID && IssuerOfPatientID != b.IssuerOfPatientID) {
+  if (PatientID != b.PatientID || IssuerOfPatientID != b.IssuerOfPatientID) {
      if (PatientName != b.PatientName)  return PatientName < b.PatientName;
      if (PatientBirthDate != b.PatientBirthDate)  return PatientBirthDate < b.PatientBirthDate;
      if (IssuerOfPatientID != b.IssuerOfPatientID)  return IssuerOfPatientID < b.IssuerOfPatientID;
@@ -196,7 +197,7 @@ bool SeriesInfo::operator<(const SeriesInfo& b) const
     if (StudyID != b.StudyID)  return StudyID < b.StudyID;
     return StudyInstanceUID < b.StudyInstanceUID;
   }
-  if (SeriesInstanceUID != b.SeriesInstanceUID) {
+  if (SeriesInstanceUID != b.SeriesInstanceUID && (Modality != b.Modality || SeriesTime != b.SeriesTime || Modality != "CT")) {
     if (slices.size()==1 && b.slices.size()==1) {
       const auto &x= *slices.begin(), &y= *b.slices.begin();
       if((!x.HasImagePositionPatient && !x.Laterality.empty()) || (!y.HasImagePositionPatient && !y.Laterality.empty())) { // for paired body parts (MG)
@@ -210,9 +211,7 @@ bool SeriesInfo::operator<(const SeriesInfo& b) const
     if (SOPClassUID != b.SOPClassUID) return SOPClassUID < b.SOPClassUID;
     return SeriesInstanceUID < b.SeriesInstanceUID;
   }
-  if (SeriesInstanceUID.empty() && slices.size() && b.slices.size()) {
-      const auto &x= *slices.begin(), &y= *b.slices.begin();
-  }
+  if (BlockID != b.BlockID) return BlockID < b.BlockID;
   return false;
 }
 
