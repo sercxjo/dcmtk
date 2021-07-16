@@ -68,6 +68,7 @@
 #include "dcmtk/ofstd/ofglobal.h"
 #include "dcmtk/ofstd/oftypes.h"
 #include "dcmtk/ofstd/ofcast.h"
+#include "dcmtk/ofstd/ofcmdln.h" // for DCMTK_USE_WCHAR_T
 #include "dcmtk/dcmnet/extneg.h"
 #include "dcmtk/dcmnet/dicom.h"
 #include "dcmtk/dcmnet/dcuserid.h"
