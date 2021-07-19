@@ -245,11 +245,14 @@ elseif(WIN32)
 endif()
 
 #-----------------------------------------------------------------------------
-# Interface target to collect all DCMTK libraries
+# Build directories
 #-----------------------------------------------------------------------------
-add_library(DCMTK INTERFACE)
-install(TARGETS DCMTK EXPORT DCMTKTargets)
-target_link_libraries(DCMTK INTERFACE config)
+set(DCMTK_BUILD_CMKDIR "${CMAKE_BINARY_DIR}")
+
+#-----------------------------------------------------------------------------
+# Start with clean DCMTKTargets.cmake, filled in GenerateCMakeExports.cmake
+#-----------------------------------------------------------------------------
+file(WRITE "${DCMTK_BUILD_CMKDIR}/DCMTKTargets.cmake" "")
 
 #-----------------------------------------------------------------------------
 # Platform-independent settings

@@ -14,22 +14,23 @@
 # DCMTKConfigVersion.cmake provides checking of DCMTK version compatibility
 # DCMTKConfig.cmake will contain options used to build this DCMTK package
 
-# Start with clean DCMTKTargets.cmake and fill it by appending
-file(WRITE "${CMAKE_BINARY_DIR}/DCMTKTargets.cmake" "")
+if(COMMAND CMAKE_POLICY)
+    if (POLICY CMP0103)
+        # suppresses error related to the following export statement
+        cmake_policy(SET CMP0103 OLD)
+    endif()
+endif()
 
 # Get and store all executable targets to DCMTKTargets.cmake within build's main dir
 get_property(DCMTK_EXECUTABLE_TARGETS GLOBAL PROPERTY DCMTK_EXECUTABLE_TARGETS)
-export(TARGETS ${DCMTK_EXECUTABLE_TARGETS} APPEND FILE "${CMAKE_BINARY_DIR}/DCMTKTargets.cmake" NAMESPACE DCMTK::)
+export(TARGETS ${DCMTK_EXECUTABLE_TARGETS} FILE "${DCMTK_BUILD_CMKDIR}/DCMTKTargets.cmake")
 
 # Get and store libraries to DCMTKTargets.cmake within the build's main dir
 get_property(DCMTK_LIBRARY_TARGETS GLOBAL PROPERTY DCMTK_LIBRARY_TARGETS)
-export(TARGETS config ${DCMTK_LIBRARY_TARGETS} APPEND FILE "${CMAKE_BINARY_DIR}/DCMTKTargets.cmake" NAMESPACE DCMTK::)
-
-# Add interface library for conveniently linking to all libraries via DCMTK::DCMTK
-export(TARGETS DCMTK APPEND FILE "${CMAKE_BINARY_DIR}/DCMTKTargets.cmake" NAMESPACE DCMTK::)
+export(TARGETS ${DCMTK_LIBRARY_TARGETS} APPEND FILE "${DCMTK_BUILD_CMKDIR}/DCMTKTargets.cmake")
 
 # Create DCMTConfigVersion.cmake with basic DCMTK version information (build tree)
-set(DCMTK_CONFIG_VERSION "${CMAKE_BINARY_DIR}/DCMTKConfigVersion.cmake")
+set(DCMTK_CONFIG_VERSION "${DCMTK_BUILD_CMKDIR}/DCMTKConfigVersion.cmake")
 WRITE_BASIC_PACKAGE_VERSION_FILE(
     ${DCMTK_CONFIG_VERSION}
     VERSION ${DCMTK_MAJOR_VERSION}.${DCMTK_MINOR_VERSION}.${DCMTK_BUILD_VERSION}
@@ -42,7 +43,7 @@ WRITE_BASIC_PACKAGE_VERSION_FILE(
 # build and install tree versions of the file.
 
 # Case 1: Configure 'DCMTKConfig.cmake' for a build tree.
-set(DCMTK_CMKDIR_CONFIG "${CMAKE_BINARY_DIR}")
+set(DCMTK_CMKDIR_CONFIG "${DCMTK_BUILD_CMKDIR}")
 # Collect include paths
 set(DCMTK_INCLUDE_DIR_CONFIGS
     "SET_AND_CHECK(DCMTK_config_INCLUDE_DIR \"${DCMTK_BINARY_DIR}/config/include/dcmtk/config\")")
@@ -56,7 +57,7 @@ foreach(module ${DCMTK_MODULES})
     set(DCMTK_CONFIG_CODE "${DCMTK_CONFIG_CODE}list(APPEND DCMTK_INCLUDE_DIRS \"${DCMTK_SOURCE_DIR}/${module}/include\")\n")
 endforeach()
 set(DCMTK_CONFIG_CODE "${DCMTK_CONFIG_CODE}##################################################")
-set(dcmtk_config "${CMAKE_BINARY_DIR}/DCMTKConfig.cmake")
+set(dcmtk_config "${DCMTK_BUILD_CMKDIR}/DCMTKConfig.cmake")
 # Actually configure file and write it to build's main directory
 CONFIGURE_PACKAGE_CONFIG_FILE(
     ${DCMTK_SOURCE_DIR}/CMake/DCMTKConfig.cmake.in
