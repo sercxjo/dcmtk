@@ -197,7 +197,7 @@ bool SeriesInfo::operator<(const SeriesInfo& b) const
     if (StudyID != b.StudyID)  return StudyID < b.StudyID;
     return StudyInstanceUID < b.StudyInstanceUID;
   }
-  if (SeriesInstanceUID != b.SeriesInstanceUID && (Modality != b.Modality || SeriesTime != b.SeriesTime || Modality != "CT")) {
+  if (SeriesInstanceUID != b.SeriesInstanceUID && (Modality != b.Modality || SeriesTime != b.SeriesTime)) {
     if (slices.size()==1 && b.slices.size()==1) {
       const auto &x= *slices.begin(), &y= *b.slices.begin();
       if((!x.HasImagePositionPatient && !x.Laterality.empty()) || (!y.HasImagePositionPatient && !y.Laterality.empty())) { // for paired body parts (MG)
